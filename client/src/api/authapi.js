@@ -15,7 +15,10 @@ export const signup = (data) => API.post("/signup", data);
 export const login = (data) => API.post("/login", data);
 export const getDashboard = () => API.get("/dashboard" );
 
-
+export const uploadResume = (formData) =>
+  API.post("/upload-resume", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
 
 
 // app.get("/api/auth/dashboard", (req, res) => {
