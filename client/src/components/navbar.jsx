@@ -31,14 +31,14 @@ const Navbar = () => {
                 <>
                   <Link
                     to="/dashboard"
-                    className="text-gray-700 hover:text-[#00a86b] transition"
+                    className="text-[#00a86b] rounded-full px-5 py-2 border-2 border-[#00a86b] font-medium hover:bg-[#00a86b] hover:text-white transition"
                   >
                     Dashboard
                   </Link>
 
                   <button
                     onClick={handleLogout}
-                    className="px-5 py-2 rounded-full border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition"
+                    className="px-5 py-2 rounded-full border cursor-pointer border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition"
                   >
                     Logout
                   </button>

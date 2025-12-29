@@ -13,7 +13,7 @@ API.interceptors.request.use((req) => {
 
 export const signup = (data) => API.post("/signup", data);
 export const login = (data) => API.post("/login", data);
-export const getDashboard = () => API.get("/dashboard", );
+export const getDashboard = () => API.get("/dashboard" );
 
 
 

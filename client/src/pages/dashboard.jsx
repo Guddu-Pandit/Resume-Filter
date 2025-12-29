@@ -17,8 +17,8 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Dashboard</h2>
+    <div style={{ padding: 200 }}>
+      <h2 className="text-5xl text-center justify-center item-center">Dashboard</h2>
       <p>{message}</p>
     </div>
   );

@@ -15,7 +15,7 @@ const Signup = () => {
       alert("Signup successful");
       navigate("/login");
     } catch (err) {
-      alert("Signup failed");
+      alert("Signup failed due to =>",err);
     }
   };
 
