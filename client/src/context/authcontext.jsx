@@ -1,23 +1,34 @@
 import { createContext, useState } from "react";
-import { setToken, removeToken } from "../utils/token";
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [isAuth, setIsAuth] = useState(!!localStorage.getItem("token"));
+  const [isAuth, setIsAuth] = useState(
+    !!localStorage.getItem("token")
+  );
 
-  const loginUser = (token) => {
-    setToken(token);
+  const [user, setUser] = useState(
+    JSON.parse(localStorage.getItem("user"))
+  );
+
+  const loginUser = (token, userData) => {
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
     setIsAuth(true);
   };
 
   const logoutUser = () => {
-    removeToken();
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setUser(null);
     setIsAuth(false);
   };
 
   return (
-    <AuthContext.Provider value={{ isAuth, loginUser, logoutUser }}>
+    <AuthContext.Provider
+      value={{ isAuth, user, loginUser, logoutUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

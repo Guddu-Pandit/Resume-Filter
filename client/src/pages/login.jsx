@@ -9,16 +9,17 @@ const Login = () => {
   const { loginUser } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await login({ email, password });
-      loginUser(res.data.token);
-      navigate("/dashboard");
-    } catch (err) {
-      alert("Invalid credentials");
-    }
-  };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const res = await login({ email, password });
+    loginUser(res.data.token, res.data.user);
+    navigate("/dashboard");
+  } catch (err) {
+    alert("Invalid credentials");
+  }
+};
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-100 to-gray-200 px-4 pt-28">

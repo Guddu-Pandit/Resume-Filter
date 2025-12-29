@@ -1,7 +1,7 @@
 import { useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/authcontext";
-import { UserCircle } from "lucide-react"; // icon
+import { UserCircle, LogOut } from "lucide-react"; // icon
 
 const Navbar = () => {
   const { isAuth, user, logoutUser } = useContext(AuthContext);
@@ -31,14 +31,14 @@ const Navbar = () => {
               {isAuth ? (
                 <>
                   {/* User Info */}
-                  <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-gray-100">
+                  <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-[#00a86b]/10">
                     <UserCircle className="w-9 h-9 text-[#00a86b]" />
 
                     <div className="leading-tight">
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-gray-700">
                         {user?.name || "User"}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-[#00a86b]">
                         {user?.email || "user@email.com"}
                       </p>
                     </div>
@@ -55,8 +55,8 @@ const Navbar = () => {
                   {/* Logout */}
                   <button
                     onClick={handleLogout}
-                    className="px-5 py-2 rounded-full border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition"
-                  >
+                    className="px-5 flex py-2 rounded-full border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition"
+                   >
                     Logout
                   </button>
                 </>
