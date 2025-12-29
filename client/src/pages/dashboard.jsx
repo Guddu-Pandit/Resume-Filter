@@ -5,6 +5,9 @@ const Dashboard = () => {
   const [message, setMessage] = useState("");
   const [resume, setResume] = useState(null);
   const [status, setStatus] = useState("");
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -35,27 +38,36 @@ const Dashboard = () => {
     }
   };
 
+  const handleAsk = async () => {
+    if (!question) return;
+
+    setLoading(true);
+    try {
+      const res = await askResume({ question });
+      setAnswer(res.data.answer);
+    } catch {
+      setAnswer("Please upload resume first.");
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 pt-32 px-6">
       <div className="max-w-7xl mx-auto space-y-10">
-
         {/* HEADER */}
-        {/* <div className="bg-white rounded-3xl shadow-xl p-8 flex flex-col md:flex-row items-center justify-between">
+        <div className="bg-white rounded-3xl shadow-xl p-8 flex flex-col md:flex-row items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Dashboard
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
             <p className="text-gray-600">{message}</p>
           </div>
 
           <span className="mt-4 md:mt-0 px-4 py-1 rounded-full bg-[#00a86b]/10 text-[#00a86b] text-sm font-medium">
             Authenticated Area
           </span>
-        </div> */}
+        </div>
 
         {/* RESUME UPLOAD SECTION */}
         <div className="grid md:grid-cols-2 gap-10">
-
           {/* LEFT – INFO */}
           <div className="bg-white rounded-3xl shadow-lg p-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">
@@ -63,8 +75,8 @@ const Dashboard = () => {
             </h2>
 
             <p className="text-gray-600 mb-6">
-              Upload your latest resume to keep your profile updated.
-              Supported formats are PDF, DOC, and DOCX.
+              Upload your latest resume to keep your profile updated. Supported
+              formats are PDF, DOC, and DOCX.
             </p>
 
             <ul className="space-y-3 text-sm text-gray-600">
@@ -99,9 +111,7 @@ const Dashboard = () => {
               <p className="text-sm text-gray-600">
                 {resume ? resume.name : "Click to select a file"}
               </p>
-              <p className="text-xs text-gray-400 mt-2">
-                Max file size: 5MB
-              </p>
+              <p className="text-xs text-gray-400 mt-2">Max file size: 5MB</p>
             </label>
 
             <button
@@ -117,6 +127,33 @@ const Dashboard = () => {
               </p>
             )}
           </div>
+          {/* ASK ABOUT RESUME */}
+          <div className="bg-white rounded-3xl shadow-lg p-8">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              Ask About Your Resume
+            </h3>
+
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Ask something like: What are my skills?"
+              className="w-full h-28 p-4 border rounded-2xl focus:outline-none focus:border-[#00a86b]"
+            />
+
+            <button
+              onClick={handleAsk}
+              disabled={loading}
+              className="mt-4 w-full py-3 rounded-full bg-[#00a86b] text-white font-semibold hover:opacity-90 transition"
+            >
+              {loading ? "Thinking..." : "Ask"}
+            </button>
+
+            {answer && (
+              <div className="mt-4 p-4 rounded-2xl bg-[#00a86b]/10 text-sm text-gray-700">
+                {answer}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -124,15 +161,6 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
-
-
-
-
-
-
-
-
 
 // import { useEffect, useState } from "react";
 // import { getDashboard } from "../api/authapi";
