@@ -1,9 +1,14 @@
 import express from "express";
-import * as pdf from "pdf-parse";
+import mongoose from "mongoose";
 import mammoth from "mammoth";
 import Resume from "../models/Resume.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/upload.js";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const pdfModule = require("pdf-parse");
+const pdfParse = typeof pdfModule === "function" ? pdfModule : pdfModule.default;
 
 const router = express.Router();
 
@@ -17,40 +22,26 @@ router.post(
         return res.status(400).json({ message: "No file uploaded" });
       }
 
+      // ✅ FIXED
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
       const file = req.file;
       let text = "";
 
-      const allowedTypes = [
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      ];
-
-      if (!allowedTypes.includes(file.mimetype)) {
-        return res
-          .status(400)
-          .json({ message: "Only PDF or DOCX files are allowed" });
-      }
-
-      /* =======================
-         PDF PARSING (Uint8Array)
-      ======================== */
       if (file.mimetype === "application/pdf") {
-        const uint8Array = new Uint8Array(file.buffer);
-        const data = await pdf.default(uint8Array);
-        text = data.text;
-      } 
-      /* =======================
-         DOCX PARSING
-      ======================== */
-      else {
+        const data = await pdfParse(file.buffer);
+        text = data.text || "";
+      } else {
         const result = await mammoth.extractRawText({
           buffer: file.buffer,
         });
-        text = result.value;
+        text = result.value || "";
       }
 
       await Resume.create({
-        userId: req.user.id,
+        userId: new mongoose.Types.ObjectId(req.user.id),
         fileName: file.originalname,
         text,
       });
@@ -58,10 +49,7 @@ router.post(
       res.status(200).json({ message: "Resume uploaded successfully" });
     } catch (err) {
       console.error("Resume upload error:", err);
-      res.status(500).json({
-        message: "Upload failed",
-        error: err.message,
-      });
+      res.status(500).json({ message: "Upload failed" });
     }
   }
 );
