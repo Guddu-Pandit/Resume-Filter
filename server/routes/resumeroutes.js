@@ -12,6 +12,9 @@ const pdfParse = typeof pdfModule === "function" ? pdfModule : pdfModule.default
 
 const router = express.Router();
 
+/* =========================
+   UPLOAD RESUME
+========================= */
 router.post(
   "/upload-resume",
   protect,
@@ -22,7 +25,6 @@ router.post(
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      // ✅ FIXED
       if (!req.user || !req.user.id) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -40,6 +42,7 @@ router.post(
         text = result.value || "";
       }
 
+      // 🔥 allow multiple resumes per user
       await Resume.create({
         userId: new mongoose.Types.ObjectId(req.user.id),
         fileName: file.originalname,
@@ -53,5 +56,25 @@ router.post(
     }
   }
 );
+
+/* =========================
+   GET USER RESUMES
+========================= */
+router.get("/my-resumes", protect, async (req, res) => {
+  try {
+    const resumes = await Resume.find(
+      { userId: req.user.id },
+      { fileName: 1, createdAt: 1 }
+    ).sort({ createdAt: -1 });
+
+    res.json({
+      count: resumes.length,
+      resumes,
+    });
+  } catch (err) {
+    console.error("Fetch resume error:", err);
+    res.status(500).json({ message: "Failed to fetch resumes" });
+  }
+});
 
 export default router;

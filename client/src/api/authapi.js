@@ -7,7 +7,6 @@ const API = axios.create({
   baseURL: "http://localhost:5000/api/auth",
 });
 
-// ✅ Attach token automatically
 API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -27,7 +26,6 @@ const RESUME_API = axios.create({
   baseURL: "http://localhost:5000/api/resume",
 });
 
-// ✅ SAME interceptor for resume upload
 RESUME_API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -36,6 +34,8 @@ RESUME_API.interceptors.request.use((req) => {
   return req;
 });
 
-// ✅ DO NOT manually set multipart headers
 export const uploadResume = (formData) =>
   RESUME_API.post("/upload-resume", formData);
+
+export const getMyResumes = () =>
+  RESUME_API.get("/my-resumes");
