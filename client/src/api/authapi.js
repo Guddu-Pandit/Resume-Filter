@@ -39,3 +39,7 @@ export const uploadResume = (formData) =>
 
 export const getMyResumes = () =>
   RESUME_API.get("/my-resumes");
+
+// ✅ NEW: Ask about resumes
+export const askResume = (data) =>
+  RESUME_API.post("/ask", data);
