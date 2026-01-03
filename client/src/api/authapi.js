@@ -1,8 +1,6 @@
 import axios from "axios";
 
-/* =======================
-   AUTH API
-======================= */
+/* AUTH API */
 const API = axios.create({
   baseURL: "http://localhost:5000/api/auth",
 });
@@ -19,9 +17,7 @@ export const signup = (data) => API.post("/signup", data);
 export const login = (data) => API.post("/login", data);
 export const getDashboard = () => API.get("/dashboard");
 
-/* =======================
-   RESUME API
-======================= */
+/* RESUME API */
 const RESUME_API = axios.create({
   baseURL: "http://localhost:5000/api/resume",
 });
@@ -40,6 +36,9 @@ export const uploadResume = (formData) =>
 export const getMyResumes = () =>
   RESUME_API.get("/my-resumes");
 
-// ✅ NEW: Ask about resumes
 export const askResume = (data) =>
   RESUME_API.post("/ask", data);
+
+// ✅ FIXED: Use RESUME_API instead of undefined 'api'
+export const deleteResume = (resumeId) =>
+  RESUME_API.delete(`/resumes/${resumeId}`);

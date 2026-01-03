@@ -78,6 +78,41 @@ router.get("/my-resumes", protect, async (req, res) => {
   }
 });
 
+
+/* =========================
+   DELETE RESUME (NEW)
+========================= */
+router.delete('/resumes/:resumeId', protect, async (req, res) => {
+  try {
+    const { resumeId } = req.params;
+
+    // Verify resume belongs to user and delete
+    const deletedResume = await Resume.findOneAndDelete({
+      _id: resumeId,
+      userId: req.user.id
+    });
+
+    if (!deletedResume) {
+      return res.status(404).json({
+        success: false,
+        message: 'Resume not found or you don\'t have permission to delete it'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Resume deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete resume error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting resume'
+    });
+  }
+});
+
+
 /* =========================
    ASK ABOUT RESUMES (NEW)
 ========================= */
