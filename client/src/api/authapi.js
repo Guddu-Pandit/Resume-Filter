@@ -42,3 +42,7 @@ export const askResume = (data) =>
 // ✅ FIXED: Use RESUME_API instead of undefined 'api'
 export const deleteResume = (resumeId) =>
   RESUME_API.delete(`/resumes/${resumeId}`);
+
+// ✅ Add this to your authapi.js
+export const getResumeContent = (resumeId) =>
+  RESUME_API.get(`/resumes/${resumeId}/content`);

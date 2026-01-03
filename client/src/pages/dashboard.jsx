@@ -5,8 +5,9 @@ import {
   getMyResumes,
   askResume,
   deleteResume,
+  getResumeContent, // ✅ NEW: Add this import
 } from "../api/authapi";
-import { ChevronDown, Eye, Trash2 } from "lucide-react";
+import { ChevronDown, Eye, Trash2, X } from "lucide-react";
 
 const Dashboard = () => {
   const [message, setMessage] = useState("");
@@ -16,13 +17,17 @@ const Dashboard = () => {
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [deletingId, setDeletingId] = useState(null); // ✅ New: Track deleting state
+  const [deletingId, setDeletingId] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false); // ✅ NEW
+  const [showPreviewModal, setShowPreviewModal] = useState(false); // ✅ NEW
+  const [resumeContent, setResumeContent] = useState(""); // ✅ NEW
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [fileCount, setFileCount] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredFiles, setFilteredFiles] = useState([]);
   const dropdownRef = useRef(null);
+  const modalRef = useRef(null); // ✅ NEW
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,6 +60,9 @@ const Dashboard = () => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
+      if (modalRef.current && !modalRef.current.contains(event.target)) {
+        setShowPreviewModal(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -70,16 +78,30 @@ const Dashboard = () => {
     }
   };
 
-  // ✅ WORKING DELETE HANDLER
+  // ✅ WORKING PREVIEW HANDLER
+  const handlePreview = async (resumeId, fileName) => {
+    try {
+      setPreviewLoading(true);
+      const res = await getResumeContent(resumeId); // Fetch content from DB
+      setResumeContent(res.data.text || "No content available");
+      setShowPreviewModal(true);
+    } catch (err) {
+      console.error("Preview failed:", err);
+      alert(`Failed to load preview for ${fileName}`);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  // WORKING DELETE HANDLER
   const handleDelete = async (resumeId, fileName) => {
     if (!confirm(`Delete "${fileName}"? This cannot be undone.`)) return;
 
     try {
       setDeletingId(resumeId);
-      await deleteResume(resumeId); // API call
-      await fetchMyResumes(); // Refresh list
-      setSearchTerm(""); // Clear search
-      alert(`✅ Deleted resume: ${fileName}`);
+      await deleteResume(resumeId);
+      await fetchMyResumes();
+      setSearchTerm("");
       console.log(`✅ Deleted resume: ${fileName}`);
     } catch (err) {
       console.error("Delete failed:", err);
@@ -136,11 +158,6 @@ const Dashboard = () => {
       setAnswer(err.response?.data?.message || "Please upload resume first.");
     }
     setLoading(false);
-  };
-
-  const handlePreview = (resumeId) => {
-    console.log("Preview clicked for:", resumeId);
-    alert(`Preview resume: ${resumeId}`);
   };
 
   const toggleDropdown = (e) => {
@@ -217,13 +234,18 @@ const Dashboard = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handlePreview(file._id);
+                              handlePreview(file._id, file.fileName);
                             }}
-                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition hover:scale-105 flex items-center gap-1 text-sm"
+                            disabled={previewLoading}
+                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition hover:scale-105 flex items-center gap-1 text-sm disabled:opacity-50"
                             title="Preview"
                           >
-                            <Eye className="w-4 h-4" />
-                            Preview
+                            {previewLoading ? (
+                              <span className="w-4 h-4 cursor-pointer border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                            {previewLoading ? "Loading..." : "Preview"}
                           </button>
                           <button
                             onClick={(e) => {
@@ -231,7 +253,7 @@ const Dashboard = () => {
                               handleDelete(file._id, file.fileName);
                             }}
                             disabled={deletingId === file._id}
-                            className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition hover:scale-105 flex items-center gap-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            className="p-2 text-red-600 cursor-pointer   hover:bg-red-100 rounded-lg transition hover:scale-105 flex items-center gap-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                             title="Delete"
                           >
                             {deletingId === file._id ? (
@@ -257,11 +279,63 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {/* ✅ PREVIEW MODAL */}
+        {showPreviewModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in zoom-in duration-200">
+            <div
+              ref={modalRef}
+              className="bg-white rounded-3xl shadow-2xl max-h-[90vh] w-full max-w-6xl flex flex-col animate-in slide-in-from-bottom-4 duration-200"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b flex justify-between items-center bg-linear-to-r from-gray-50 to-white">
+                <h3 className="text-xl  font-bold text-gray-900 flex items-center gap-2">
+                  <Eye className="w-6 h-6 text-blue-600" />
+                  Resume Preview
+                </h3>
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="p-2 cursor-pointer hover:bg-gray-200 rounded-xl transition-all hover:scale-110"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Loading State */}
+              {previewLoading && (
+                <div className="flex items-center justify-center py-12">
+                  <span className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mr-3" />
+                  <span className="text-lg text-gray-600">Loading resume content...</span>
+                </div>
+              )}
+
+              {/* Content */}
+              {!previewLoading && (
+                <div className="p-6 flex-1 overflow-hidden flex flex-col">
+                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50 rounded-2xl max-h-[70vh]">
+                    <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800 font-mono">
+                      {resumeContent || "No content available"}
+                    </pre>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="pt-4 border-t flex gap-3 justify-end">
+                    <button
+                      onClick={() => setShowPreviewModal(false)}
+                      className="px-6 py-2 text-gray-700 cursor-pointer bg-gray-100 hover:bg-gray-200 rounded-xl transition-all font-medium"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Upload & Ask Section */}
         <div className="grid md:grid-cols-2 gap-10">
           <div className="bg-white rounded-3xl shadow-lg p-8">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Upload Resume
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Upload Resume</h3>
             <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl px-6 py-10 cursor-pointer hover:border-[#00a86b] transition">
               <input
                 type="file"
@@ -277,21 +351,17 @@ const Dashboard = () => {
             <button
               onClick={handleUpload}
               disabled={uploading}
-              className="w-full mt-6 py-3 rounded-full border-2 border-[#00a86b] text-[#00a86b] font-semibold hover:bg-[#00a86b] hover:text-white transition disabled:opacity-60"
+              className="w-full mt-6 cursor-pointer py-3 rounded-full border-2 border-[#00a86b] text-[#00a86b] font-semibold hover:bg-[#00a86b] hover:text-white transition disabled:opacity-60"
             >
               {uploading ? "Uploading..." : "Upload Resume"}
             </button>
             {status && (
-              <p className="mt-4 text-center text-sm text-[#00a86b]">
-                {status}
-              </p>
+              <p className="mt-4 text-center text-sm text-[#00a86b]">{status}</p>
             )}
           </div>
 
           <div className="bg-white rounded-3xl shadow-lg p-8">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Ask About Your Resume
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Ask About Your Resume</h3>
             <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
@@ -301,7 +371,7 @@ const Dashboard = () => {
             <button
               onClick={handleAsk}
               disabled={loading}
-              className="mt-4 w-full py-3 rounded-full bg-[#00a86b] text-white font-semibold hover:opacity-90 transition"
+              className="mt-4 w-full py-3 cursor-pointer rounded-full bg-[#00a86b] text-white font-semibold hover:opacity-90 transition"
             >
               {loading ? "Analyzing..." : "Ask"}
             </button>

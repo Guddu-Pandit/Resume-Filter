@@ -114,6 +114,39 @@ router.delete('/resumes/:resumeId', protect, async (req, res) => {
 
 
 /* =========================
+   GET RESUME CONTENT (NEW)
+========================= */
+router.get('/resumes/:resumeId/content', protect, async (req, res) => {
+  try {
+    const { resumeId } = req.params;
+    
+    const resume = await Resume.findOne({
+      _id: resumeId,
+      userId: req.user.id
+    });
+
+    if (!resume) {
+      return res.status(404).json({
+        success: false,
+        message: 'Resume not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      text: resume.text
+    });
+  } catch (error) {
+    console.error('Get resume content error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+
+/* =========================
    ASK ABOUT RESUMES (NEW)
 ========================= */
 router.post("/ask", protect, async (req, res) => {
