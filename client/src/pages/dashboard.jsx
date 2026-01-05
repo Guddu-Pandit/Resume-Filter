@@ -286,7 +286,10 @@ const Dashboard = () => {
             <div className="flex-1 flex flex-col">
               <textarea
                 value={question}
-                onChange={(e) => setQuestion(e.target.value)}
+                onChange={(e) => {
+                  setQuestion(e.target.value);
+                  if (!e.target.value.trim()) setAnswer("");
+                }}
                 placeholder="Ex: 'Find candidates with 5+ years of React experience...'"
                 className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-[#00a86b] focus:ring-2 focus:ring-[#00a86b]/20 resize-none text-slate-700 placeholder:text-slate-400 transition-all min-h-[140px]"
               />
@@ -307,9 +310,25 @@ const Dashboard = () => {
 
             {answer && (
               <div className="mt-6 p-5 rounded-2xl bg-[#00a86b]/5 border border-[#00a86b]/10 text-sm text-slate-700 max-h-48 overflow-y-auto whitespace-pre-wrap animate-in fade-in slide-in-from-top-2">
-                {answer.split('**').map((part, i) =>
-                  i % 2 === 1 ? <strong key={i} className="text-[#00a86b] font-bold">{part}</strong> : part
-                )}
+                {answer.split('**').map((part, i) => {
+                  if (i % 2 === 1) {
+                    const match = uploadedFiles.find(f => f.fileName === part || f.fileName.includes(part));
+                    if (match) {
+                      return (
+                        <span
+                          key={i}
+                          onClick={() => handlePreview(match._id, match.fileName)}
+                          className="text-[#00a86b] font-bold cursor-pointer hover:underline"
+                          title="Click to preview"
+                        >
+                          {part}
+                        </span>
+                      );
+                    }
+                    return <strong key={i} className="text-[#00a86b] font-bold">{part}</strong>;
+                  }
+                  return part;
+                })}
               </div>
             )}
           </div>
