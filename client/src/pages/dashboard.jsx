@@ -321,7 +321,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Upload & Ask Section - Unchanged */}
+        {/* Upload & Ask Section */}
         <div className="grid md:grid-cols-2 gap-10">
           <div className="bg-white rounded-3xl shadow-lg p-8">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Upload Resume</h3>
@@ -355,7 +355,7 @@ const Dashboard = () => {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="Ask something like: Show me resumes with frontend developer skills."
-              className="w-full h-28 p-4 border rounded-2xl focus:outline-none focus:border-[#00a86b]"
+              className="w-full h-32 p-4 border rounded-2xl focus:outline-none focus:border-[#00a86b]"
             />
             <button
               onClick={handleAsk}
