@@ -1,19 +1,20 @@
 import { useState } from "react";
 import { signup } from "../api/authapi";
 import { useNavigate } from "react-router-dom";
+import Modal from "../components/ui/Modal";
 
 const Signup = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       await signup({ name, email, password });
-      alert("Signup successful");
-      navigate("/login");
+      setShowSuccessModal(true);
     } catch (err) {
       alert("Signup failed due to =>", err);
     }
@@ -21,6 +22,33 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] px-4 pt-20 font-['Inter',sans-serif]">
+      {/* Success Modal */}
+      <Modal
+        isOpen={showSuccessModal}
+        title="Account Created!"
+        onClose={() => navigate("/login")}
+        showCloseButton={false}
+      >
+        <div className="text-center space-y-6">
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+          </div>
+          <div>
+            <p className="text-slate-600">
+              Your account has been successfully created.
+              <br />
+              Please log in to continue to your dashboard.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/login")}
+            className="w-full py-3 rounded-xl bg-[#00a86b] text-white font-semibold hover:bg-[#008f5a] transition-all shadow-lg shadow-[#00a86b]/20"
+          >
+            Go to Login
+          </button>
+        </div>
+      </Modal>
+
       <div className="w-full max-w-5xl bg-white shadow-2xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden flex flex-col md:flex-row min-h-[600px] animate-in zoom-in-95 duration-500">
 
         {/* LEFT – SIGNUP FORM */}

@@ -7,9 +7,12 @@ import {
   deleteResume,
   getResumeContent,
 } from "../api/authapi";
-import { ChevronDown, Eye, Trash2, X } from "lucide-react";
+import { Trash2, FileText, CheckCircle, Upload, MessageSquare, Plus, Search, ChevronDown, ChevronUp, Eye, X } from "lucide-react";
+import Modal from "../components/ui/Modal";
+import { useToast } from "../context/ToastContext";
 
 const Dashboard = () => {
+  const { addToast } = useToast();
   const [message, setMessage] = useState("");
   const [resume, setResume] = useState(null);
   const [status, setStatus] = useState("");
@@ -26,6 +29,8 @@ const Dashboard = () => {
   const [showResumesList, setShowResumesList] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredFiles, setFilteredFiles] = useState([]);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, fileName: "" });
+  const [previewMeta, setPreviewMeta] = useState({ id: null, fileName: "" });
   const modalRef = useRef(null);
 
   useEffect(() => {
@@ -75,30 +80,38 @@ const Dashboard = () => {
       setPreviewLoading(true);
       const res = await getResumeContent(resumeId);
       setResumeContent(res.data.text || "No content available");
+      setPreviewMeta({ id: resumeId, fileName });
       setShowPreviewModal(true);
     } catch (err) {
       console.error("Preview failed:", err);
-      alert(`Failed to load preview for ${fileName}`);
+      addToast(`Failed to load preview for ${fileName}`, "error");
     } finally {
       setPreviewLoading(false);
     }
   };
 
   // WORKING DELETE HANDLER
-  const handleDelete = async (resumeId, fileName) => {
-    if (!confirm(`Delete "${fileName}"? This cannot be undone.`)) return;
+  const initiateDelete = (id, fileName) => {
+    setDeleteModal({ isOpen: true, id, fileName });
+  };
 
+  const confirmDelete = async () => {
+    const { id, fileName } = deleteModal;
     try {
-      setDeletingId(resumeId);
-      await deleteResume(resumeId);
+      if (deletingId) return; // Prevent double submission
+      setDeletingId(id);
+      await deleteResume(id);
       await fetchMyResumes();
       setSearchTerm("");
       console.log(`Deleted resume: ${fileName}`);
+      addToast(`Deleted ${fileName}`, "success");
     } catch (err) {
       console.error("Delete failed:", err);
-      alert(`Failed to delete "${fileName}". Please try again.`);
+      addToast(`Failed to delete "${fileName}"`, "error");
     } finally {
       setDeletingId(null);
+      setDeleteModal({ isOpen: false, id: null, fileName: "" });
+      if (showPreviewModal) setShowPreviewModal(false); // Close preview if deleting from there
     }
   };
 
@@ -124,6 +137,7 @@ const Dashboard = () => {
       await fetchMyResumes();
 
       setStatus(res.data.message || "Resume uploaded successfully");
+      addToast(res.data.message || "Resume uploaded successfully", "success");
       setTimeout(() => {
         setStatus("");
       }, 3000);
@@ -154,6 +168,44 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-[#f8fafc] pt-28 px-6 pb-12 font-['Inter',sans-serif]">
       <div className="max-w-7xl mx-auto space-y-12">
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          isOpen={deleteModal.isOpen}
+          title="Delete Resume"
+          onClose={() => setDeleteModal({ isOpen: false, id: null, fileName: "" })}
+        >
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 p-4 bg-red-50 rounded-xl border border-red-100 text-red-700">
+              <div className="p-2 bg-red-100 rounded-full">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="font-semibold">Are you sure?</p>
+                <p className="text-sm opacity-90">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <p className="text-slate-600">
+              You are about to delete <span className="font-bold text-slate-900">{deleteModal.fileName}</span>.
+            </p>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setDeleteModal({ isOpen: false, id: null, fileName: "" })}
+                className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </Modal>
 
         {/* Header Section */}
         <div className="text-center space-y-4 mb-12">
@@ -292,7 +344,7 @@ const Dashboard = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <svg className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
               </div>
 
               {/* Grid of Resumes */}
@@ -327,7 +379,7 @@ const Dashboard = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDelete(file._id, file.fileName);
+                            initiateDelete(file._id, file.fileName);
                           }}
                           disabled={deletingId === file._id}
                           className="flex-1 py-2 px-3 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
