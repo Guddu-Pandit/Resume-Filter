@@ -14,6 +14,10 @@ const resumeSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  embedding: {
+    type: [Number], // Vector embedding for RAG
+    required: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

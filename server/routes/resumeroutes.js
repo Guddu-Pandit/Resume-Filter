@@ -9,6 +9,13 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const pdfModule = require("pdf-parse");
 const pdfParse = typeof pdfModule === "function" ? pdfModule : pdfModule.default;
+import { generateEmbedding } from "../utils/embedding.js";
+import { cosineSimilarity } from "../utils/cosineSimilarity.js";
+import { genAI } from "../config/gemini.js";
+
+// Initialize Gemini model (lazily or using shared client)
+// Switching to gemini-2.0-flash-exp as gemini-2.0-flash hit a 0 quota limit
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
 const router = express.Router();
 
@@ -43,10 +50,13 @@ router.post(
       }
 
       // 🔥 allow multiple resumes per user
+      const embedding = await generateEmbedding(text);
+
       await Resume.create({
         userId: new mongoose.Types.ObjectId(req.user.id),
         fileName: file.originalname,
         text,
+        embedding,
       });
 
       res.status(200).json({ message: "Resume uploaded successfully" });
@@ -146,8 +156,80 @@ router.get('/resumes/:resumeId/content', protect, async (req, res) => {
 
 
 /* =========================
-   ASK ABOUT RESUMES (KEYWORD-BASED - NO LLM)
+   ASK ABOUT RESUMES (RAG + GEMINI)
 ========================= */
+router.post("/ask", protect, async (req, res) => {
+  try {
+    const { question } = req.body;
+
+    if (!question || !question.trim()) {
+      return res.status(400).json({ message: "Question is required" });
+    }
+
+    // 1. Fetch user's resumes with embeddings
+    const resumes = await Resume.find({ userId: req.user.id });
+
+    if (resumes.length === 0) {
+      return res.status(400).json({ message: "No resumes uploaded." });
+    }
+
+    // 2. Generate embedding for the question
+    const questionEmbedding = await generateEmbedding(question);
+
+    // 3. Calculate similarity scores
+    const scoredResumes = resumes.map((resume) => {
+      // If resume has no embedding (old upload), skip or treat as 0
+      if (!resume.embedding || resume.embedding.length === 0) {
+        return { ...resume.toObject(), score: 0 };
+      }
+      return {
+        ...resume.toObject(),
+        score: cosineSimilarity(questionEmbedding, resume.embedding),
+      };
+    });
+
+    // 4. Sort by score (descending) and take top 3
+    scoredResumes.sort((a, b) => b.score - a.score);
+    const topResumes = scoredResumes.slice(0, 3);
+
+    // 5. Construct Prompt for Gemini
+    const context = topResumes
+      .map(
+        (r, i) =>
+          `Resume ${i + 1} (${r.fileName}):\n${r.text.slice(0, 3000)}...` // Truncate to avoid huge prompts
+      )
+      .join("\n\n");
+
+    const prompt = `
+      You are an AI assistant analyzing resumes.
+      User Question: "${question}"
+
+      Here are the most relevant resumes found:
+      ${context}
+
+      Based ONLY on the provided resumes, answer the user's question.
+      If the answer is not in the resumes, say "I cannot find that information in the provided resumes."
+      Cite the filename when mentioning specific details.
+    `;
+
+    // 6. Generate Answer
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const answer = response.text();
+
+    res.json({ answer });
+  } catch (err) {
+    console.error("Ask resume error:", err);
+    res.status(500).json({ message: "Failed to process your request" });
+  }
+});
+
+/* =========================
+   LEGACY: KEYWORD-BASED SEARCH (COMMENTED OUT)
+========================= */
+// router.post("/ask-legacy", protect, async (req, res) => { ... (old logic logic here) ... });
+// Original code kept below for reference but inactive within this route file structure if needed to revert.
+/*
 router.post("/ask", protect, async (req, res) => {
   try {
     const { question } = req.body;
@@ -202,7 +284,7 @@ router.post("/ask", protect, async (req, res) => {
 
       for (const skill of skillKeywords) {
         // Check if skill exists in resume text (word boundary match for accuracy)
-        const regex = new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+        const regex = new RegExp(\`\\b\${skill.replace(/[.*+?^${}()|[]\\]/g, '\\$&')}\\b\`, 'i');
         if (regex.test(resumeText)) {
           foundSkills.push(skill);
         }
@@ -219,15 +301,15 @@ router.post("/ask", protect, async (req, res) => {
     // Format response
     if (matches.length === 0) {
       return res.json({
-        answer: `No resumes found matching: ${skillKeywords.join(", ")}`
+        answer: \`No resumes found matching: \${skillKeywords.join(", ")}\`
       });
     }
 
     const resultLines = matches.map((match, index) =>
-      `${index + 1}. 📄 **${match.fileName}**\n   Skills found: ${match.matchedSkills.join(", ")}`
+      \`${index + 1}. 📄 **\${match.fileName}**\n   Skills found: \${match.matchedSkills.join(", ")}\`
     );
 
-    const answer = `Found ${matches.length} resume(s) matching your search:\n\n${resultLines.join("\n\n")}`;
+    const answer = \`Found \${matches.length} resume(s) matching your search:\n\n\${resultLines.join("\n\n")}\`;
 
     res.json({ answer });
   } catch (err) {
@@ -235,5 +317,6 @@ router.post("/ask", protect, async (req, res) => {
     res.status(500).json({ message: "Failed to search resumes. Please try again." });
   }
 });
+*/
 
 export default router;
