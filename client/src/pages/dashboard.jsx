@@ -14,7 +14,7 @@ import { useToast } from "../context/ToastContext";
 const Dashboard = () => {
   const { addToast } = useToast();
   const [message, setMessage] = useState("");
-  const [resume, setResume] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [status, setStatus] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -116,38 +116,52 @@ const Dashboard = () => {
   };
 
   const handleUpload = async () => {
-    if (!resume) {
-      setStatus("Please select a resume file");
+    if (selectedFiles.length === 0) {
+      setStatus("Please select at least one resume file");
       return;
     }
 
-    if (resume.size > 5 * 1024 * 1024) {
-      setStatus("File size must be less than 5MB");
-      return;
+    setUploading(true);
+    setStatus("Starting upload...");
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+
+      if (file.size > 5 * 1024 * 1024) {
+        addToast(`Skipped ${file.name}: File too large (>5MB)`, "error");
+        failCount++;
+        continue;
+      }
+
+      const formData = new FormData();
+      formData.append("resume", file);
+
+      try {
+        setStatus(`Uploading ${i + 1}/${selectedFiles.length}: ${file.name}...`);
+        await uploadResume(formData);
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to upload ${file.name}:`, err);
+        addToast(`Failed to upload ${file.name}`, "error");
+        failCount++;
+      }
     }
 
-    const formData = new FormData();
-    formData.append("resume", resume);
+    await fetchMyResumes();
+    setUploading(false);
+    setSelectedFiles([]);
 
-    try {
-      setUploading(true);
+    if (successCount > 0) {
+      const msg = `Successfully uploaded ${successCount} resume${successCount !== 1 ? 's' : ''}`;
+      setStatus(msg);
+      addToast(msg, "success");
+      setTimeout(() => setStatus(""), 4000);
+    } else if (failCount > 0) {
+      setStatus("Upload failed. Please try again.");
+    } else {
       setStatus("");
-
-      const res = await uploadResume(formData);
-      await fetchMyResumes();
-
-      setStatus(res.data.message || "Resume uploaded successfully");
-      addToast(res.data.message || "Resume uploaded successfully", "success");
-      setTimeout(() => {
-        setStatus("");
-      }, 3000);
-      setResume(null);
-    } catch (err) {
-      setStatus(
-        err.response?.data?.message || "Upload failed. Please try again."
-      );
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -228,27 +242,32 @@ const Dashboard = () => {
               Upload Resume
             </h3>
 
-            <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-2xl px-6 py-12 cursor-pointer transition-all duration-300 ${resume ? 'border-[#00a86b] bg-[#00a86b]/5' : 'border-slate-200 hover:border-[#00a86b]/50 hover:bg-slate-50'}`}>
+            <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-2xl px-6 py-12 cursor-pointer transition-all duration-300 ${selectedFiles.length > 0 ? 'border-[#00a86b] bg-[#00a86b]/5' : 'border-slate-200 hover:border-[#00a86b]/50 hover:bg-slate-50'}`}>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
+                multiple
                 className="hidden"
-                onChange={(e) => setResume(e.target.files[0])}
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setSelectedFiles(Array.from(e.target.files));
+                  }
+                }}
               />
-              {resume ? (
+              {selectedFiles.length > 0 ? (
                 <div className="text-center">
                   <div className="w-12 h-12 bg-[#00a86b]/10 text-[#00a86b] rounded-full flex items-center justify-center mx-auto mb-3">
                     <span className="text-xl">📄</span>
                   </div>
-                  <p className="font-medium text-slate-900">{resume.name}</p>
-                  <p className="text-xs text-slate-500 mt-1">{(resume.size / 1024 / 1024).toFixed(2)} MB</p>
+                  <p className="font-medium text-slate-900">{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected</p>
+                  <p className="text-xs text-slate-500 mt-1">Click to change selection</p>
                 </div>
               ) : (
                 <div className="text-center space-y-2">
                   <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
                     <span className="text-xl font-bold">+</span>
                   </div>
-                  <p className="font-medium text-slate-600">Click to upload file</p>
+                  <p className="font-medium text-slate-600">Click to upload files</p>
                   <p className="text-xs text-slate-400">PDF, DOC, DOCX up to 5MB</p>
                 </div>
               )}
@@ -256,7 +275,7 @@ const Dashboard = () => {
 
             <button
               onClick={handleUpload}
-              disabled={uploading || !resume}
+              disabled={uploading || selectedFiles.length === 0}
               className="w-full mt-6 py-3.5 rounded-xl bg-[#00a86b] text-white font-semibold shadow-lg shadow-[#00a86b]/20 hover:shadow-[#00a86b]/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
             >
               {uploading ? (
@@ -264,7 +283,7 @@ const Dashboard = () => {
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Uploading...
                 </span>
-              ) : "Upload Resume"}
+              ) : `Upload ${selectedFiles.length > 0 ? selectedFiles.length : ''} Resume${selectedFiles.length !== 1 ? 's' : ''}`}
             </button>
 
             {status && (
