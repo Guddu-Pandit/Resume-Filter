@@ -45,12 +45,12 @@ const Navbar = () => {
                   </div>
 
                   {/* Dashboard */}
-                  <Link
+                  {/* <Link
                     to="/dashboard"
                     className="text-[#00a86b] rounded-full px-5 py-2 border-2 border-[#00a86b] hover:bg-[#00a86b] hover:text-white transition"
                   >
                     Dashboard
-                  </Link>
+                  </Link> */}
 
                   {/* Logout */}
                   <button

@@ -18,16 +18,16 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [previewLoading, setPreviewLoading] = useState(false); // ✅ NEW
-  const [showPreviewModal, setShowPreviewModal] = useState(false); // ✅ NEW
-  const [resumeContent, setResumeContent] = useState(""); // ✅ NEW
+  const [previewLoading, setPreviewLoading] = useState(false); 
+  const [showPreviewModal, setShowPreviewModal] = useState(false); 
+  const [resumeContent, setResumeContent] = useState(""); 
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [fileCount, setFileCount] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredFiles, setFilteredFiles] = useState([]);
   const dropdownRef = useRef(null);
-  const modalRef = useRef(null); // ✅ NEW
+  const modalRef = useRef(null); 
 
   useEffect(() => {
     const fetchData = async () => {
@@ -166,8 +166,8 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 pt-32 px-6">
-      <div className="max-w-7xl mx-auto space-y-10">
+    <div className="min-h-screen max-w-7xl mx-auto  bg-linear-to-br from-gray-50 to-gray-100 pt-32 px-6">
+      <div className="space-y-10">
         {/* HEADER */}
         <div className="bg-white rounded-3xl shadow-xl p-8 flex flex-col md:flex-row items-center justify-between">
           <div
