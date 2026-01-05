@@ -5,7 +5,6 @@ import Resume from "../models/Resume.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/upload.js";
 import { createRequire } from "module";
-import { GoogleGenerativeAI } from "@google/generative-ai"; // ✅ New import
 
 const require = createRequire(import.meta.url);
 const pdfModule = require("pdf-parse");
@@ -119,7 +118,7 @@ router.delete('/resumes/:resumeId', protect, async (req, res) => {
 router.get('/resumes/:resumeId/content', protect, async (req, res) => {
   try {
     const { resumeId } = req.params;
-    
+
     const resume = await Resume.findOne({
       _id: resumeId,
       userId: req.user.id
@@ -147,7 +146,7 @@ router.get('/resumes/:resumeId/content', protect, async (req, res) => {
 
 
 /* =========================
-   ASK ABOUT RESUMES (NEW)
+   ASK ABOUT RESUMES (KEYWORD-BASED - NO LLM)
 ========================= */
 router.post("/ask", protect, async (req, res) => {
   try {
@@ -167,38 +166,73 @@ router.post("/ask", protect, async (req, res) => {
       return res.status(400).json({ message: "No resumes uploaded. Please upload at least one resume." });
     }
 
-    // Concatenate resume texts (limit to avoid token overflow; GenAI handles ~1M tokens, but keep concise)
-    let resumeTexts = resumes.map((r, index) => `Resume ${index + 1}: "${r.fileName}"\nContent: ${r.text.substring(0, 2000)}...`).join("\n\n---\n\n");
+    // Common words to ignore when extracting skills
+    const stopWords = [
+      "the", "and", "or", "a", "an", "is", "are", "was", "were", "has", "have", "had",
+      "do", "does", "did", "will", "would", "could", "should", "may", "might", "must",
+      "be", "been", "being", "am", "it", "its", "this", "that", "these", "those",
+      "who", "what", "which", "where", "when", "why", "how", "all", "each", "every",
+      "both", "few", "more", "most", "other", "some", "such", "no", "not", "only",
+      "same", "so", "than", "too", "very", "just", "but", "if", "then", "else",
+      "with", "from", "for", "of", "to", "in", "on", "at", "by", "about", "into",
+      "through", "during", "before", "after", "above", "below", "between", "under",
+      "again", "further", "once", "here", "there", "any", "can", "show", "me",
+      "resumes", "resume", "skills", "skill", "find", "search", "get", "list", "give"
+    ];
 
-    // Initialize Google GenAI
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Fast and cost-effective for this use case
+    // Extract skill keywords from question
+    const skillKeywords = question
+      .toLowerCase()
+      .replace(/[^a-z0-9\s+#.-]/g, " ") // Keep alphanumeric, +, #, ., - for skills like C++, C#, .NET
+      .split(/\s+/)
+      .filter(word => word.length > 1 && !stopWords.includes(word));
 
-    // Prompt engineering: Instruct to search for skills/resumes matching the question
-    const prompt = `
-      You are a resume analyst. Analyze the following user-uploaded resumes and answer the question: "${question}"
+    if (skillKeywords.length === 0) {
+      return res.json({
+        answer: "Please specify skills to search for. Example: 'React', 'Python', 'frontend developer'"
+      });
+    }
 
-      Resumes:
-      ${resumeTexts}
+    // Search each resume for matching skills
+    const matches = [];
 
-      Instructions:
-      - Search for relevant skills/experiences in the resumes (e.g., if question mentions "frontend developer", look for HTML, CSS, JavaScript, React, Vue, etc.).
-      - List ONLY the matching resume filenames (e.g., "Resume 1: my-resume-2023.pdf").
-      - For each, briefly explain why it matches (1-2 sentences).
-      - If no matches, say "No resumes match this query."
-      - Format response as a numbered list for clarity.
-      - Keep response concise (under 300 words).
+    for (const resume of resumes) {
+      const resumeText = resume.text.toLowerCase();
+      const foundSkills = [];
 
-      Response:
-    `;
+      for (const skill of skillKeywords) {
+        // Check if skill exists in resume text (word boundary match for accuracy)
+        const regex = new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+        if (regex.test(resumeText)) {
+          foundSkills.push(skill);
+        }
+      }
 
-    const result = await model.generateContent(prompt);
-    const generatedText = await result.response.text();
+      if (foundSkills.length > 0) {
+        matches.push({
+          fileName: resume.fileName,
+          matchedSkills: [...new Set(foundSkills)] // Remove duplicates
+        });
+      }
+    }
 
-    res.json({ answer: generatedText });
+    // Format response
+    if (matches.length === 0) {
+      return res.json({
+        answer: `No resumes found matching: ${skillKeywords.join(", ")}`
+      });
+    }
+
+    const resultLines = matches.map((match, index) =>
+      `${index + 1}. 📄 **${match.fileName}**\n   Skills found: ${match.matchedSkills.join(", ")}`
+    );
+
+    const answer = `Found ${matches.length} resume(s) matching your search:\n\n${resultLines.join("\n\n")}`;
+
+    res.json({ answer });
   } catch (err) {
     console.error("Ask resume error:", err);
-    res.status(500).json({ message: "Failed to analyze resumes. Please try again." });
+    res.status(500).json({ message: "Failed to search resumes. Please try again." });
   }
 });
 

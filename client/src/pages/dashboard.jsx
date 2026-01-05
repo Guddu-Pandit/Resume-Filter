@@ -18,15 +18,15 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [previewLoading, setPreviewLoading] = useState(false); 
-  const [showPreviewModal, setShowPreviewModal] = useState(false); 
-  const [resumeContent, setResumeContent] = useState(""); 
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [resumeContent, setResumeContent] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [fileCount, setFileCount] = useState(0);
-  const [showResumesList, setShowResumesList] = useState(false); 
+  const [showResumesList, setShowResumesList] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredFiles, setFilteredFiles] = useState([]);
-  const modalRef = useRef(null); 
+  const modalRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -168,9 +168,8 @@ const Dashboard = () => {
               Uploaded resume{fileCount !== 1 && "s"}
             </span>
             <ChevronDown
-              className={`w-7 h-7 transition-transform duration-200 ${
-                showResumesList ? "rotate-180" : ""
-              } group-hover:scale-110`}
+              className={`w-7 h-7 transition-transform duration-200 ${showResumesList ? "rotate-180" : ""
+                } group-hover:scale-110`}
             />
           </button>
 
@@ -186,7 +185,7 @@ const Dashboard = () => {
                     className="w-full pl-10 pr-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#00a86b] focus:ring-2 focus:ring-[#00a86b]/20"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    // autoFocus
+                  // autoFocus
                   />
                   <svg
                     className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2"
@@ -305,7 +304,7 @@ const Dashboard = () => {
                       {resumeContent || "No content available"}
                     </pre>
                   </div>
-                  
+
                   {/* Action Buttons */}
                   <div className="pt-4 border-t flex gap-3 justify-end">
                     <button
@@ -354,7 +353,7 @@ const Dashboard = () => {
             <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask something like: Show me resumes with frontend developer skills."
+              placeholder="Search for skills like: React, Python, frontend, JavaScript..."
               className="w-full h-32 p-4 border rounded-2xl focus:outline-none focus:border-[#00a86b]"
             />
             <button
@@ -365,8 +364,10 @@ const Dashboard = () => {
               {loading ? "Analyzing..." : "Ask"}
             </button>
             {answer && (
-              <div className="mt-4 p-4 rounded-2xl bg-[#00a86b]/10 text-sm text-gray-700 max-h-48 overflow-y-auto">
-                {answer}
+              <div className="mt-4 p-4 rounded-2xl bg-[#00a86b]/10 text-sm text-gray-700 max-h-48 overflow-y-auto whitespace-pre-wrap">
+                {answer.split('**').map((part, i) =>
+                  i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                )}
               </div>
             )}
           </div>
