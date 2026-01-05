@@ -63,13 +63,13 @@ const Dashboard = () => {
     }
   };
 
-  // ✅ SIMPLIFIED TOGGLE - No dropdown refs needed
+  // SIMPLIFIED TOGGLE - No dropdown refs needed
   const toggleResumesList = (e) => {
     e.stopPropagation();
     setShowResumesList(!showResumesList);
   };
 
-  // ✅ WORKING PREVIEW HANDLER
+  // WORKING PREVIEW HANDLER
   const handlePreview = async (resumeId, fileName) => {
     try {
       setPreviewLoading(true);
@@ -93,7 +93,7 @@ const Dashboard = () => {
       await deleteResume(resumeId);
       await fetchMyResumes();
       setSearchTerm("");
-      console.log(`✅ Deleted resume: ${fileName}`);
+      console.log(`Deleted resume: ${fileName}`);
     } catch (err) {
       console.error("Delete failed:", err);
       alert(`Failed to delete "${fileName}". Please try again.`);
@@ -152,89 +152,177 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen max-w-7xl mx-auto bg-linear-to-br from-gray-50 to-gray-100 pt-32 px-6">
-      <div className="space-y-10 ">
-        {/* ✅ HEADER WITH INLINE EXPANDABLE SECTION */}
-        <div className="bg-white rounded-3xl shadow-xl  p-8">
-          {/* Toggle Button */}
-          <button
-            onClick={toggleResumesList}
-            className="w-full text-3xl font-bold py-4 text-gray-900 cursor-pointer select-none flex items-center justify-between hover:bg-gray-50 px-4 rounded-xl transition-all group"
-          >
-            <span className="flex items-center gap-2">
-              <span className="font-semibold text-[#00a86b] text-2xl">
-                {/* {fileCount} */}
-              </span>
-              Uploaded resume{fileCount !== 1 && "s"}
-            </span>
-            <ChevronDown
-              className={`w-7 h-7 transition-transform duration-200 ${showResumesList ? "rotate-180" : ""
-                } group-hover:scale-110`}
-            />
-          </button>
+    <div className="min-h-screen bg-[#f8fafc] pt-28 px-6 pb-12 font-['Inter',sans-serif]">
+      <div className="max-w-7xl mx-auto space-y-12">
 
-          {/* ✅ EXPANDABLE INLINE LIST - Shows BELOW the button */}
-          {showResumesList && (
-            <div className="mt-4 animate-in slide-in-from-top-2 duration-200">
-              {/* Search Bar */}
-              <div className="mb-4 pb-3 border-b">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search resumes by name..."
-                    className="w-full pl-10 pr-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#00a86b] focus:ring-2 focus:ring-[#00a86b]/20"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  // autoFocus
-                  />
-                  <svg
-                    className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.35-4.35"></path>
-                  </svg>
+        {/* Header Section */}
+        <div className="text-center space-y-4 mb-12">
+          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">
+            Resume <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00a86b] to-[#008f5a]">Intelligence</span>
+          </h1>
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+            Upload resumes, ask questions, and accept smart insights instantly.
+          </p>
+        </div>
+
+        {/* Primary Actions: Upload & Ask */}
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* Upload Card */}
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 transition-all hover:shadow-md group">
+            <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+              <div className="p-2 bg-[#00a86b]/10 rounded-lg text-[#00a86b]">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+              </div>
+              Upload Resume
+            </h3>
+
+            <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-2xl px-6 py-12 cursor-pointer transition-all duration-300 ${resume ? 'border-[#00a86b] bg-[#00a86b]/5' : 'border-slate-200 hover:border-[#00a86b]/50 hover:bg-slate-50'}`}>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                className="hidden"
+                onChange={(e) => setResume(e.target.files[0])}
+              />
+              {resume ? (
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-[#00a86b]/10 text-[#00a86b] rounded-full flex items-center justify-center mx-auto mb-3">
+                    <span className="text-xl">📄</span>
+                  </div>
+                  <p className="font-medium text-slate-900">{resume.name}</p>
+                  <p className="text-xs text-slate-500 mt-1">{(resume.size / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
+              ) : (
+                <div className="text-center space-y-2">
+                  <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
+                    <span className="text-xl font-bold">+</span>
+                  </div>
+                  <p className="font-medium text-slate-600">Click to upload file</p>
+                  <p className="text-xs text-slate-400">PDF, DOC, DOCX up to 5MB</p>
+                </div>
+              )}
+            </label>
+
+            <button
+              onClick={handleUpload}
+              disabled={uploading || !resume}
+              className="w-full mt-6 py-3.5 rounded-xl bg-[#00a86b] text-white font-semibold shadow-lg shadow-[#00a86b]/20 hover:shadow-[#00a86b]/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+            >
+              {uploading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Uploading...
+                </span>
+              ) : "Upload Resume"}
+            </button>
+
+            {status && (
+              <div className={`mt-4 p-3 rounded-xl text-sm font-medium text-center animate-in fade-in slide-in-from-top-2 ${status.includes('failed') || status.includes('error') ? 'bg-red-50 text-red-600' : 'bg-[#00a86b]/10 text-[#00a86b]'}`}>
+                {status}
+              </div>
+            )}
+          </div>
+
+          {/* Ask Card */}
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 transition-all hover:shadow-md flex flex-col">
+            <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+              <div className="p-2 bg-[#00a86b]/10 rounded-lg text-[#00a86b]">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+              </div>
+              Ask Resume Intelligence
+            </h3>
+
+            <div className="flex-1 flex flex-col">
+              <textarea
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="Ex: 'Find candidates with 5+ years of React experience...'"
+                className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-[#00a86b] focus:ring-2 focus:ring-[#00a86b]/20 resize-none text-slate-700 placeholder:text-slate-400 transition-all min-h-[140px]"
+              />
+
+              <button
+                onClick={handleAsk}
+                disabled={loading || !question.trim()}
+                className="mt-4 w-full py-3.5 rounded-xl bg-slate-900 text-white font-semibold shadow-lg shadow-slate-900/20 hover:bg-slate-800 hover:shadow-slate-900/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Analyzing...
+                  </span>
+                ) : "Run Analysis"}
+              </button>
+            </div>
+
+            {answer && (
+              <div className="mt-6 p-5 rounded-2xl bg-[#00a86b]/5 border border-[#00a86b]/10 text-sm text-slate-700 max-h-48 overflow-y-auto whitespace-pre-wrap animate-in fade-in slide-in-from-top-2">
+                {answer.split('**').map((part, i) =>
+                  i % 2 === 1 ? <strong key={i} className="text-[#00a86b] font-bold">{part}</strong> : part
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Uploaded Resumes List (Moved to Bottom) */}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <div
+            onClick={toggleResumesList}
+            className="w-full p-6 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors group select-none"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-[#00a86b]/10 group-hover:text-[#00a86b] transition-colors">
+                <span className="font-bold text-lg">{fileCount}</span>
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">Uploaded Resumes</h2>
+            </div>
+            <ChevronDown
+              className={`w-6 h-6 text-slate-400 transition-transform duration-300 ${showResumesList ? "rotate-180" : ""}`}
+            />
+          </div>
+
+          {/* Expandable Content */}
+          <div className={`transition-all duration-300 ease-in-out border-t border-slate-100 ${showResumesList ? 'opacity-100 max-h-[800px]' : 'opacity-0 max-h-0 hidden'}`}>
+            <div className="p-6">
+              {/* Search Bar */}
+              <div className="relative mb-6">
+                <input
+                  type="text"
+                  placeholder="Search stored resumes..."
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#00a86b] focus:ring-2 focus:ring-[#00a86b]/20 transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <svg className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
               </div>
 
-              {/* Resumes List */}
-              <div className="space-y-3 max-h-80 overflow-y-auto">
+              {/* Grid of Resumes */}
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                 {filteredFiles.length > 0 ? (
                   filteredFiles.map((file) => (
                     <div
                       key={file._id}
-                      className="group flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all border border-gray-100"
+                      className="group relative bg-white border border-slate-100 rounded-2xl p-4 hover:shadow-md hover:border-[#00a86b]/30 transition-all flex flex-col"
                     >
-                      <div className="flex items-center gap-4 truncate flex-1">
-                        <span className="text-2xl">📄</span>
-                        <div className="truncate">
-                          <p className="font-semibold text-base text-gray-900 truncate">
-                            {file.fileName}
-                          </p>
-                          <p className="text-sm text-gray-500 truncate">
-                            {file._id.slice(-8)}
-                          </p>
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#00a86b]/10 text-[#00a86b] flex items-center justify-center shrink-0">
+                          <span className="text-lg">📄</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-semibold text-slate-800 truncate" title={file.fileName}>{file.fileName}</h4>
+                          <p className="text-xs text-slate-400 font-mono mt-0.5">ID: {file._id.slice(-6)}</p>
                         </div>
                       </div>
 
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <div className="flex items-center gap-2 mt-auto pt-2 opacity-60 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePreview(file._id, file.fileName);
                           }}
                           disabled={previewLoading}
-                          className="p-3 text-blue-600 cursor-pointer hover:bg-blue-100 rounded-xl transition hover:scale-105 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Preview"
+                          className="flex-1 py-2 px-3 bg-[#00a86b]/10 text-[#00a86b] hover:bg-[#00a86b]/20 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                         >
-                          {previewLoading ? (
-                            <span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                          Preview
+                          <Eye className="w-4 h-4" /> Preview
                         </button>
                         <button
                           onClick={(e) => {
@@ -242,8 +330,7 @@ const Dashboard = () => {
                             handleDelete(file._id, file.fileName);
                           }}
                           disabled={deletingId === file._id}
-                          className="p-3 text-red-600 cursor-pointer hover:bg-red-100 rounded-xl transition hover:scale-105 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Delete"
+                          className="flex-1 py-2 px-3 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                         >
                           {deletingId === file._id ? (
                             <span className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
@@ -256,123 +343,86 @@ const Dashboard = () => {
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    {searchTerm
-                      ? `No resumes found for "${searchTerm}"`
-                      : "No resumes uploaded yet"}
+                  <div className="col-span-full py-12 text-center">
+                    <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <p className="text-slate-500 font-medium">{searchTerm ? `No results for "${searchTerm}"` : "No resumes stored yet."}</p>
                   </div>
                 )}
               </div>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* ✅ PREVIEW MODAL - Unchanged */}
+        {/* Preview Modal */}
         {showPreviewModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in zoom-in duration-200">
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <div
               ref={modalRef}
-              className="bg-white rounded-3xl shadow-2xl max-h-[90vh] w-full max-w-6xl flex flex-col animate-in slide-in-from-bottom-4 duration-200"
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col animate-in zoom-in-95 duration-200"
             >
-              {/* Modal Header */}
-              <div className="p-6 border-b flex justify-between items-center bg-linear-to-r from-gray-50 to-white">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Eye className="w-6 h-6 text-blue-600" />
-                  Resume Preview
+              <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-3xl">
+                <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                  <div className="p-1.5 bg-white rounded-md shadow-sm border border-slate-100"><Eye className="w-4 h-4 text-[#00a86b]" /></div>
+                  Document Preview
                 </h3>
                 <button
                   onClick={() => setShowPreviewModal(false)}
-                  className="p-2 cursor-pointer hover:bg-gray-200 rounded-xl transition-all hover:scale-110"
+                  className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Loading State */}
-              {previewLoading && (
-                <div className="flex items-center justify-center py-12">
-                  <span className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mr-3" />
-                  <span className="text-lg text-gray-600">Loading resume content...</span>
-                </div>
-              )}
-
-              {/* Content */}
-              {!previewLoading && (
-                <div className="p-6 flex-1 overflow-hidden flex flex-col">
-                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50 rounded-2xl max-h-[70vh]">
-                    <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800 font-mono">
-                      {resumeContent || "No content available"}
-                    </pre>
+              <div className="flex-1 overflow-hidden p-0 relative bg-slate-50">
+                {previewLoading ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
+                    <span className="w-10 h-10 border-4 border-slate-200 border-t-[#00a86b] rounded-full animate-spin mb-4" />
+                    <p>Loading document content...</p>
                   </div>
-
-                  {/* Action Buttons */}
-                  <div className="pt-4 border-t flex gap-3 justify-end">
-                    <button
-                      onClick={() => setShowPreviewModal(false)}
-                      className="px-6 py-2 text-gray-700 cursor-pointer bg-gray-100 hover:bg-gray-200 rounded-xl transition-all font-medium"
-                    >
-                      Close
-                    </button>
+                ) : (
+                  <div className="h-full overflow-y-auto p-8 custom-scrollbar">
+                    <div className="bg-white shadow-sm border border-slate-200 min-h-full p-8 md:p-12 max-w-[800px] mx-auto rounded-none md:rounded-lg">
+                      <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800 font-serif">
+                        {resumeContent || "No content extracted available for this document."}
+                      </pre>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+
+              <div className="p-4 border-t bg-white rounded-b-3xl flex justify-end">
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="px-5 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Close Viewer
+                </button>
+              </div>
             </div>
           </div>
         )}
-
-        {/* Upload & Ask Section */}
-        <div className="grid md:grid-cols-2 gap-10">
-          <div className="bg-white rounded-3xl shadow-lg p-8">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Upload Resume</h3>
-            <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl px-6 py-10 cursor-pointer hover:border-[#00a86b] transition">
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx"
-                className="hidden"
-                onChange={(e) => setResume(e.target.files[0])}
-              />
-              <p className="text-sm text-gray-600">
-                {resume ? resume.name : "Click to select a file"}
-              </p>
-              <p className="text-xs text-gray-400 mt-2">Max file size: 5MB</p>
-            </label>
-            <button
-              onClick={handleUpload}
-              disabled={uploading}
-              className="w-full mt-6 cursor-pointer py-3 rounded-full border-2 border-[#00a86b] text-[#00a86b] font-semibold hover:bg-[#00a86b] hover:text-white transition disabled:opacity-60"
-            >
-              {uploading ? "Uploading..." : "Upload Resume"}
-            </button>
-            {status && (
-              <p className="mt-4 text-center text-sm text-[#00a86b]">{status}</p>
-            )}
-          </div>
-
-          <div className="bg-white rounded-3xl shadow-lg p-8">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Ask About Your Resume</h3>
-            <textarea
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Search for skills like: React, Python, frontend, JavaScript..."
-              className="w-full h-32 p-4 border rounded-2xl focus:outline-none focus:border-[#00a86b]"
-            />
-            <button
-              onClick={handleAsk}
-              disabled={loading}
-              className="mt-4 w-full py-3 cursor-pointer rounded-full bg-[#00a86b] text-white font-semibold hover:opacity-90 transition"
-            >
-              {loading ? "Analyzing..." : "Ask"}
-            </button>
-            {answer && (
-              <div className="mt-4 p-4 rounded-2xl bg-[#00a86b]/10 text-sm text-gray-700 max-h-48 overflow-y-auto whitespace-pre-wrap">
-                {answer.split('**').map((part, i) =>
-                  i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-                )}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
+
+      {/* Custom Scrollbar Styles */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background-color: #cbd5e1;
+          border-radius: 20px;
+          border: 3px solid transparent;
+          background-clip: content-box;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: #94a3b8;
+        }
+      `}</style>
     </div>
   );
 };
