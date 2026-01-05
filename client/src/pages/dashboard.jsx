@@ -5,7 +5,7 @@ import {
   getMyResumes,
   askResume,
   deleteResume,
-  getResumeContent, // ✅ NEW: Add this import
+  getResumeContent,
 } from "../api/authapi";
 import { ChevronDown, Eye, Trash2, X } from "lucide-react";
 
@@ -23,10 +23,9 @@ const Dashboard = () => {
   const [resumeContent, setResumeContent] = useState(""); 
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [fileCount, setFileCount] = useState(0);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [showResumesList, setShowResumesList] = useState(false); 
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredFiles, setFilteredFiles] = useState([]);
-  const dropdownRef = useRef(null);
   const modalRef = useRef(null); 
 
   useEffect(() => {
@@ -54,20 +53,6 @@ const Dashboard = () => {
     }
   }, [searchTerm, uploadedFiles]);
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
-      }
-      if (modalRef.current && !modalRef.current.contains(event.target)) {
-        setShowPreviewModal(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const fetchMyResumes = async () => {
     try {
       const res = await getMyResumes();
@@ -78,11 +63,17 @@ const Dashboard = () => {
     }
   };
 
+  // ✅ SIMPLIFIED TOGGLE - No dropdown refs needed
+  const toggleResumesList = (e) => {
+    e.stopPropagation();
+    setShowResumesList(!showResumesList);
+  };
+
   // ✅ WORKING PREVIEW HANDLER
   const handlePreview = async (resumeId, fileName) => {
     try {
       setPreviewLoading(true);
-      const res = await getResumeContent(resumeId); // Fetch content from DB
+      const res = await getResumeContent(resumeId);
       setResumeContent(res.data.text || "No content available");
       setShowPreviewModal(true);
     } catch (err) {
@@ -160,48 +151,45 @@ const Dashboard = () => {
     setLoading(false);
   };
 
-  const toggleDropdown = (e) => {
-    e.stopPropagation();
-    setShowDropdown(!showDropdown);
-  };
-
   return (
-    <div className="min-h-screen max-w-7xl mx-auto  bg-linear-to-br from-gray-50 to-gray-100 pt-32 px-6">
-      <div className="space-y-10">
-        {/* HEADER */}
-        <div className="bg-white rounded-3xl shadow-xl p-8 flex flex-col md:flex-row items-center justify-between">
-          <div
-            className="relative group mt-3"
-            ref={dropdownRef}
-            onMouseEnter={() => setShowDropdown(true)}
-            onMouseLeave={() => setShowDropdown(false)}
+    <div className="min-h-screen max-w-7xl mx-auto bg-linear-to-br from-gray-50 to-gray-100 pt-32 px-6">
+      <div className="space-y-10 ">
+        {/* ✅ HEADER WITH INLINE EXPANDABLE SECTION */}
+        <div className="bg-white rounded-3xl shadow-xl  p-8">
+          {/* Toggle Button */}
+          <button
+            onClick={toggleResumesList}
+            className="w-full text-3xl font-bold py-4 text-gray-900 cursor-pointer select-none flex items-center justify-between hover:bg-gray-50 px-4 rounded-xl transition-all group"
           >
-            <button
-              onClick={toggleDropdown}
-              className="text-3xl font-bold py-2 text-gray-900 mb-2 cursor-pointer select-none flex items-center gap-2 hover:bg-gray-50 px-4 rounded-xl transition-all"
-            >
-              <span className="font-semibold text-[#00a86b]">{fileCount}</span>{" "}
+            <span className="flex items-center gap-2">
+              <span className="font-semibold text-[#00a86b] text-2xl">
+                {/* {fileCount} */}
+              </span>
               Uploaded resume{fileCount !== 1 && "s"}
-              <ChevronDown
-                className={`w-5 h-5 transition-transform ${
-                  showDropdown ? "rotate-180" : ""
-                }`}
-              />
-            </button>
+            </span>
+            <ChevronDown
+              className={`w-7 h-7 transition-transform duration-200 ${
+                showResumesList ? "rotate-180" : ""
+              } group-hover:scale-110`}
+            />
+          </button>
 
-            {showDropdown && (
-              <div className="absolute left-0 right-0 mt-2 w-96 bg-white border rounded-xl shadow-2xl p-4 z-50 animate-in slide-in-from-top-2 duration-200">
-                <div className="mb-3 pb-2 border-b relative">
+          {/* ✅ EXPANDABLE INLINE LIST - Shows BELOW the button */}
+          {showResumesList && (
+            <div className="mt-4 animate-in slide-in-from-top-2 duration-200">
+              {/* Search Bar */}
+              <div className="mb-4 pb-3 border-b">
+                <div className="relative">
                   <input
                     type="text"
                     placeholder="Search resumes by name..."
-                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#00a86b] focus:ring-2 focus:ring-[#00a86b]/20"
+                    className="w-full pl-10 pr-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-[#00a86b] focus:ring-2 focus:ring-[#00a86b]/20"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    autoFocus
+                    // autoFocus
                   />
                   <svg
-                    className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+                    className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -210,76 +198,77 @@ const Dashboard = () => {
                     <path d="m21 21-4.35-4.35"></path>
                   </svg>
                 </div>
-
-                <ul className="space-y-2 max-h-60 overflow-y-auto">
-                  {filteredFiles.length > 0 ? (
-                    filteredFiles.map((file) => (
-                      <li
-                        key={file._id}
-                        className="group flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-all"
-                      >
-                        <div className="flex items-center gap-3 truncate flex-1">
-                          <span className="text-lg">📄</span>
-                          <div className="truncate">
-                            <p className="font-medium text-sm text-gray-900 truncate">
-                              {file.fileName}
-                            </p>
-                            <p className="text-xs text-gray-500 truncate">
-                              {file._id.slice(-8)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all ml-4">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePreview(file._id, file.fileName);
-                            }}
-                            disabled={previewLoading}
-                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition hover:scale-105 flex items-center gap-1 text-sm disabled:opacity-50"
-                            title="Preview"
-                          >
-                            {previewLoading ? (
-                              <span className="w-4 h-4 cursor-pointer border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Eye className="w-4 h-4" />
-                            )}
-                            {previewLoading ? "Loading..." : "Preview"}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(file._id, file.fileName);
-                            }}
-                            disabled={deletingId === file._id}
-                            className="p-2 text-red-600 cursor-pointer   hover:bg-red-100 rounded-lg transition hover:scale-105 flex items-center gap-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                            title="Delete"
-                          >
-                            {deletingId === file._id ? (
-                              <span className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
-                            {deletingId === file._id ? "Deleting..." : "Delete"}
-                          </button>
-                        </div>
-                      </li>
-                    ))
-                  ) : (
-                    <li className="text-sm text-gray-500 text-center py-8">
-                      {searchTerm
-                        ? `No resumes found for "${searchTerm}"`
-                        : "No resumes uploaded yet"}
-                    </li>
-                  )}
-                </ul>
               </div>
-            )}
-          </div>
+
+              {/* Resumes List */}
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {filteredFiles.length > 0 ? (
+                  filteredFiles.map((file) => (
+                    <div
+                      key={file._id}
+                      className="group flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all border border-gray-100"
+                    >
+                      <div className="flex items-center gap-4 truncate flex-1">
+                        <span className="text-2xl">📄</span>
+                        <div className="truncate">
+                          <p className="font-semibold text-base text-gray-900 truncate">
+                            {file.fileName}
+                          </p>
+                          <p className="text-sm text-gray-500 truncate">
+                            {file._id.slice(-8)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePreview(file._id, file.fileName);
+                          }}
+                          disabled={previewLoading}
+                          className="p-3 text-blue-600 cursor-pointer hover:bg-blue-100 rounded-xl transition hover:scale-105 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Preview"
+                        >
+                          {previewLoading ? (
+                            <span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                          Preview
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(file._id, file.fileName);
+                          }}
+                          disabled={deletingId === file._id}
+                          className="p-3 text-red-600 cursor-pointer hover:bg-red-100 rounded-xl transition hover:scale-105 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Delete"
+                        >
+                          {deletingId === file._id ? (
+                            <span className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    {searchTerm
+                      ? `No resumes found for "${searchTerm}"`
+                      : "No resumes uploaded yet"}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* ✅ PREVIEW MODAL */}
+        {/* ✅ PREVIEW MODAL - Unchanged */}
         {showPreviewModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in zoom-in duration-200">
             <div
@@ -288,7 +277,7 @@ const Dashboard = () => {
             >
               {/* Modal Header */}
               <div className="p-6 border-b flex justify-between items-center bg-linear-to-r from-gray-50 to-white">
-                <h3 className="text-xl  font-bold text-gray-900 flex items-center gap-2">
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                   <Eye className="w-6 h-6 text-blue-600" />
                   Resume Preview
                 </h3>
@@ -332,7 +321,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Upload & Ask Section */}
+        {/* Upload & Ask Section - Unchanged */}
         <div className="grid md:grid-cols-2 gap-10">
           <div className="bg-white rounded-3xl shadow-lg p-8">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Upload Resume</h3>
