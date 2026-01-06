@@ -18,7 +18,7 @@ const Dashboard = () => {
   const [status, setStatus] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
-  const [matches, setMatches] = useState([]); // [NEW] Store regex matches
+  const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -32,6 +32,7 @@ const Dashboard = () => {
   const [filteredFiles, setFilteredFiles] = useState([]);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, fileName: "" });
   const [previewMeta, setPreviewMeta] = useState({ id: null, fileName: "" });
+  const [showMatchesList, setShowMatchesList] = useState(true);
   const modalRef = useRef(null);
 
   useEffect(() => {
@@ -225,7 +226,7 @@ const Dashboard = () => {
         </Modal>
 
         {/* Header Section */}
-        <div className="text-center space-y-4 mb-12">
+        <div className="text-center space-y-4 my-10">
           <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">
             Resume <span className="text-transparent bg-clip-text bg-linear-to-r from-[#00a86b] to-[#008f5a]">Intelligence</span>
           </h1>
@@ -346,31 +347,56 @@ const Dashboard = () => {
 
                 {/* Regex Matches Section */}
                 {matches.length > 0 && (
-                  <div className="mt-2 border-0 border-slate-200">
-                    <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-                      <span className="text-lg">🎯</span>Direct Skill Matches
-                    </h4>
-                    <div className="space-y-2">
-                      {matches.map((match) => (
-                        <div key={match._id} className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-[#00a86b]/30 transition-colors">
-                          <div className="min-w-0">
-                            <p className="font-semibold text-slate-900 truncate">{match.fileName}</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {match.matchedSkills && match.matchedSkills.map((skill, idx) => (
-                                <span key={idx} className="text-[10px] px-1.5 py-0.5 bg-[#00a86b]/10 text-[#00a86b] rounded-md font-medium uppercase tracking-wider">
+                  <div className="mt-2 border-0 border-slate-100 pt-2">
+                    {/* Collapsible Header */}
+                    <div
+                      onClick={() => setShowMatchesList(!showMatchesList)}
+                      className="flex items-center justify-between cursor-pointer group select-none mb-3"
+                    >
+                      <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                        <span className="text-lg">🎯</span>
+                        Direct Skill Matches
+                        <span className="bg-[#00a86b]/10 text-[#00a86b] text-xs px-2 py-0.5 rounded-full font-bold">
+                          {matches.length}
+                        </span>
+                      </h4>
+                      <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${showMatchesList ? "rotate-180" : ""}`} />
+                    </div>
+
+                    {/* Collapsible Grid Content */}
+                    <div className={`transition-all duration-300 ease-in-out ${showMatchesList ? 'opacity-100 max-h-120' : 'opacity-0 max-h-0 hidden'}`}>
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 overflow-y-auto max-h-60 pr-1 custom-scrollbar">
+                        {matches.map((match) => (
+                          <div key={match._id} className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2 hover:border-[#00a86b]/30 transition-colors">
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-900 truncate text-sm" title={match.fileName}>{match.fileName}</p>
+                                {/* <p className="text-[10px] text-slate-400 font-mono mt-0.5">Score: {match.score}</p> */}
+                              </div>
+                              <button
+                                onClick={() => handlePreview(match._id, match.fileName)}
+                                className="p-1.5 bg-slate-50 hover:bg-[#00a86b] text-slate-500 hover:text-white rounded-lg transition-colors"
+                                title="Preview Resume"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {/* <div className="flex flex-wrap gap-1">
+                              {match.matchedSkills && match.matchedSkills.slice(0, 3).map((skill, idx) => (
+                                <span key={idx} className="text-[10px] px-1.5 py-0.5 bg-[#00a86b]/5 text-[#00a86b] rounded-md font-medium uppercase tracking-wider border border-[#00a86b]/10">
                                   {skill}
                                 </span>
                               ))}
-                            </div>
+                              {match.matchedSkills && match.matchedSkills.length > 3 && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-slate-50 text-slate-400 rounded-md font-medium border border-slate-100">
+                                  +{match.matchedSkills.length - 3}
+                                </span>
+                              )}
+                            </div> */}
                           </div>
-                          <button
-                            onClick={() => handlePreview(match._id, match.fileName)}
-                            className="px-3 py-1.5 text-xs font-semibold bg-slate-50 hover:bg-[#00a86b] text-slate-600 hover:text-white rounded-lg transition-colors flex items-center gap-1"
-                          >
-                            <Eye className="w-3 h-3" /> Preview
-                          </button>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

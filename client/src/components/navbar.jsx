@@ -1,16 +1,30 @@
-import { useContext } from "react";
+import { useContext, useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/authcontext";
-import { UserCircle, LogOut } from "lucide-react"; 
+import { UserCircle, LogOut, FileSearch, ChevronDown } from "lucide-react";
 
 const Navbar = () => {
   const { isAuth, user, logoutUser } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
 
   const handleLogout = () => {
     logoutUser();
+    setShowDropdown(false);
     navigate("/");
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 px-4 pt-4">
@@ -32,35 +46,53 @@ const Navbar = () => {
             </Link>
 
             {/* Right Section */}
-            <div className="flex items-center space-x-6 text-sm font-medium">
+            <div className="flex items-center text-sm font-medium">
               {isAuth ? (
-                <>
-                  {/* User Info */}
-                  <div className="flex items-center gap-3 pl-4 pr-2 py-1.5 rounded-full bg-slate-50 border border-slate-100">
-                    <div className="leading-tight text-right hidden sm:block">
-                      <p className="text-sm font-semibold text-gray-700">
-                        {user?.name || "User"}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {user?.email || "user@email.com"}
-                      </p>
-                    </div>
-                    <div className="w-9 h-9 rounded-full bg-[#00a86b]/10 flex items-center justify-center text-[#00a86b]">
-                      <UserCircle className="w-6 h-6" />
-                    </div>
-                  </div>
-
-                  {/* Logout */}
+                <div className="relative" ref={dropdownRef}>
+                  {/* User Icon Button */}
                   <button
-                    onClick={handleLogout}
-                    className="p-2.5 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                    title="Logout"
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    className="w-10 h-10 rounded-full bg-[#00a86b]/10 flex items-center justify-center text-[#00a86b] hover:bg-[#00a86b]/20 transition-colors"
                   >
-                    <LogOut className="w-5 h-5" />
+                    <UserCircle className="w-6 h-6" />
                   </button>
-                </>
+
+                  {/* Dropdown Menu */}
+                  {showDropdown && (
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-slate-100 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                      {/* User Info */}
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <p className="font-semibold text-slate-800 truncate">
+                          {user?.name || "User"}
+                        </p>
+                        <p className="text-sm text-slate-500 truncate">
+                          {user?.email || "user@email.com"}
+                        </p>
+                      </div>
+
+                      {/* Resume Analyzer Link */}
+                      <Link
+                        to="/resume-analyzer"
+                        onClick={() => setShowDropdown(false)}
+                        className="flex items-center gap-3 px-4 py-3 text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <FileSearch className="w-5 h-5 text-[#00a86b]" />
+                        <span className="font-medium">Resume Analyzer</span>
+                      </Link>
+
+                      {/* Logout */}
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut className="w-5 h-5" />
+                        <span className="font-medium">Logout</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : (
-                <>
+                <div className="flex items-center space-x-6">
                   <Link
                     to="/login"
                     className="px-6 py-2.5 rounded-xl text-slate-600 hover:text-[#00a86b] hover:bg-[#00a86b]/5 transition font-semibold"
@@ -74,7 +106,7 @@ const Navbar = () => {
                   >
                     Get Started
                   </Link>
-                </>
+                </div>
               )}
             </div>
 

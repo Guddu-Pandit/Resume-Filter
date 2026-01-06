@@ -4,6 +4,7 @@ import Home from "./pages/home";
 import Login from "./pages/login";
 import Signup from "./pages/signup";
 import Dashboard from "./pages/dashboard";
+import ResumeAnalyzer from "./pages/resumeanalyzer";
 import ProtectedRoute from "./components/protectedroute";
 import "./index.css";
 
@@ -20,6 +21,14 @@ const App = () => {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/resume-analyzer"
+          element={
+            <ProtectedRoute>
+              <ResumeAnalyzer />
             </ProtectedRoute>
           }
         />
