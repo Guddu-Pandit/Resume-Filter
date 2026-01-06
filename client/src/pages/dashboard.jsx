@@ -7,7 +7,7 @@ import {
   deleteResume,
   getResumeContent,
 } from "../api/authapi";
-import { Trash2, FileText, CheckCircle, Upload, MessageSquare, Plus, Search, ChevronDown, ChevronUp, Eye, X } from "lucide-react";
+import { Trash2, FileText, CheckCircle, Upload, MessageSquare, Plus, Search, ChevronDown, ChevronUp, Eye, X, Lock } from "lucide-react";
 import Modal from "../components/ui/Modal";
 import { useToast } from "../context/ToastContext";
 
@@ -18,6 +18,7 @@ const Dashboard = () => {
   const [status, setStatus] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [matches, setMatches] = useState([]); // [NEW] Store regex matches
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -170,9 +171,11 @@ const Dashboard = () => {
 
     setLoading(true);
     setAnswer("");
+    setMatches([]); // Reset matches
     try {
       const res = await askResume({ question });
       setAnswer(res.data.answer);
+      if (res.data.matches) setMatches(res.data.matches);
     } catch (err) {
       setAnswer(err.response?.data?.message || "Please upload resume first.");
     }
@@ -180,7 +183,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] pt-28 px-6 pb-12 font-['Inter',sans-serif]">
+    <div className="min-h-screen bg-linear-to-b from-[#00a86b]/10 to-[#fefefe] to-[#fefefe] pt-28 px-6 pb-12 font-['Inter',sans-serif]">
       <div className="max-w-7xl mx-auto space-y-12">
 
         {/* Delete Confirmation Modal */}
@@ -224,7 +227,7 @@ const Dashboard = () => {
         {/* Header Section */}
         <div className="text-center space-y-4 mb-12">
           <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">
-            Resume <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00a86b] to-[#008f5a]">Intelligence</span>
+            Resume <span className="text-transparent bg-clip-text bg-linear-to-r from-[#00a86b] to-[#008f5a]">Intelligence</span>
           </h1>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
             Upload resumes, ask questions, and accept smart insights instantly.
@@ -267,8 +270,13 @@ const Dashboard = () => {
                   <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
                     <span className="text-xl font-bold">+</span>
                   </div>
-                  <p className="font-medium text-slate-600">Click to upload files</p>
-                  <p className="text-xs text-slate-400">PDF, DOC, DOCX up to 5MB</p>
+                  <p className="font-medium text-slate-600">Drop your resume here or choose a file.</p>
+                  <p className="text-xs text-slate-400">PDF & DOCX only. Max 5MB file size.</p>
+
+                  <div className="flex items-center w-fit gap-1.5 mt-2 bg-slate-50 px-3 justify-center mx-auto py-1.5 rounded-full border border-slate-100">
+                    <Lock className="w-3 h-3 text-slate-400" />
+                    <span className="text-[10px] uppercase tracking-wide font-bold text-slate-400">Privacy guaranteed</span>
+                  </div>
                 </div>
               )}
             </label>
@@ -310,7 +318,7 @@ const Dashboard = () => {
                   if (!e.target.value.trim()) setAnswer("");
                 }}
                 placeholder="Ex: 'Find candidates with 5+ years of React experience...'"
-                className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-[#00a86b] focus:ring-2 focus:ring-[#00a86b]/20 resize-none text-slate-700 placeholder:text-slate-400 transition-all min-h-[140px]"
+                className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-[#00a86b] focus:ring-2 focus:ring-[#00a86b]/20 resize-none text-slate-700 placeholder:text-slate-400 transition-all min-h-35"
               />
 
               <button
@@ -328,26 +336,44 @@ const Dashboard = () => {
             </div>
 
             {answer && (
-              <div className="mt-6 p-5 rounded-2xl bg-[#00a86b]/5 border border-[#00a86b]/10 text-sm text-slate-700 max-h-48 overflow-y-auto whitespace-pre-wrap animate-in fade-in slide-in-from-top-2">
-                {answer.split('**').map((part, i) => {
-                  if (i % 2 === 1) {
-                    const match = uploadedFiles.find(f => f.fileName === part || f.fileName.includes(part));
-                    if (match) {
-                      return (
-                        <span
-                          key={i}
-                          onClick={() => handlePreview(match._id, match.fileName)}
-                          className="text-[#00a86b] font-bold cursor-pointer hover:underline"
-                          title="Click to preview"
-                        >
-                          {part}
-                        </span>
-                      );
-                    }
-                    return <strong key={i} className="text-[#00a86b] font-bold">{part}</strong>;
-                  }
-                  return part;
-                })}
+              <div className="mt-6 p-5 rounded-2xl bg-[#00a86b]/5 border border-[#00a86b]/10 text-sm text-slate-700 animate-in fade-in slide-in-from-top-2">
+                {/* <div className="whitespace-pre-wrap max-h-48 overflow-y-auto mb-4 custom-scrollbar">
+                  {answer.split('**').map((part, i) => {
+                    if (i % 2 === 1) return <strong key={i} className="text-[#00a86b] font-bold">{part}</strong>;
+                    return part;
+                  })}
+                </div> */}
+
+                {/* Regex Matches Section */}
+                {matches.length > 0 && (
+                  <div className="mt-2 border-0 border-slate-200">
+                    <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                      <span className="text-lg">🎯</span>Direct Skill Matches
+                    </h4>
+                    <div className="space-y-2">
+                      {matches.map((match) => (
+                        <div key={match._id} className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-[#00a86b]/30 transition-colors">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-900 truncate">{match.fileName}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {match.matchedSkills && match.matchedSkills.map((skill, idx) => (
+                                <span key={idx} className="text-[10px] px-1.5 py-0.5 bg-[#00a86b]/10 text-[#00a86b] rounded-md font-medium uppercase tracking-wider">
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handlePreview(match._id, match.fileName)}
+                            className="px-3 py-1.5 text-xs font-semibold bg-slate-50 hover:bg-[#00a86b] text-slate-600 hover:text-white rounded-lg transition-colors flex items-center gap-1"
+                          >
+                            <Eye className="w-3 h-3" /> Preview
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -371,7 +397,7 @@ const Dashboard = () => {
           </div>
 
           {/* Expandable Content */}
-          <div className={`transition-all duration-300 ease-in-out border-t border-slate-100 ${showResumesList ? 'opacity-100 max-h-[800px]' : 'opacity-0 max-h-0 hidden'}`}>
+          <div className={`transition-all duration-300 ease-in-out border-t border-slate-100 ${showResumesList ? 'opacity-100 max-h-200' : 'opacity-0 max-h-0 hidden'}`}>
             <div className="p-6">
               {/* Search Bar */}
               <div className="relative mb-6">
@@ -386,7 +412,7 @@ const Dashboard = () => {
               </div>
 
               {/* Grid of Resumes */}
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-125 overflow-y-auto pr-2 custom-scrollbar">
                 {filteredFiles.length > 0 ? (
                   filteredFiles.map((file) => (
                     <div
@@ -473,7 +499,7 @@ const Dashboard = () => {
                   </div>
                 ) : (
                   <div className="h-full overflow-y-auto p-8 custom-scrollbar">
-                    <div className="bg-white shadow-sm border border-slate-200 min-h-full p-8 md:p-12 max-w-[800px] mx-auto rounded-none md:rounded-lg">
+                    <div className="bg-white shadow-sm border border-slate-200 min-h-full p-8 md:p-12 max-w-200 mx-auto rounded-none md:rounded-lg">
                       <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800 font-serif">
                         {resumeContent || "No content extracted available for this document."}
                       </pre>

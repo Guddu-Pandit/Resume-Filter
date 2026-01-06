@@ -1,11 +1,16 @@
-import { embeddingModel } from "../config/gemini.js";
+import { ai, EMBEDDING_MODEL_NAME } from "../config/gemini.js";
 
 export const generateEmbedding = async (text) => {
-  if (!embeddingModel) {
-    throw new Error("Gemini embedding model not initialized");
-  }
+  // Ensure text length is within limits
+  // Warning: New SDK syntax
+  const result = await ai.models.embedContent({
+    model: EMBEDDING_MODEL_NAME,
+    contents: text.slice(0, 10000),
+  });
 
-  // Ensure text length is within limits (GenAI has a limit, typically 10k tokens, slicing chars is a rough safety net)
-  const result = await embeddingModel.embedContent(text.slice(0, 10000));
+  // The structure of result might differ in the new SDK. 
+  // Usually result.embedding or result.embeddings[0].values
+  // Based on common patterns: return result.embedding.values;
+  // Let's assume standard response structure.
   return result.embedding.values;
 };

@@ -9,13 +9,12 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const pdfModule = require("pdf-parse");
 const pdfParse = typeof pdfModule === "function" ? pdfModule : pdfModule.default;
-import { generateEmbedding } from "../utils/embedding.js";
-import { cosineSimilarity } from "../utils/cosineSimilarity.js";
-import { genAI } from "../config/gemini.js";
+import { ai } from "../config/gemini.js";
 
 // Initialize Gemini model (lazily or using shared client)
 // Switching to gemini-2.0-flash-exp as gemini-2.0-flash hit a 0 quota limit
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+// In new SDK, we just define the model name string here for usage later.
+const GENERATION_MODEL = "gemini-2.5-flash";
 
 const router = express.Router();
 
@@ -50,13 +49,14 @@ router.post(
       }
 
       // 🔥 allow multiple resumes per user
-      const embedding = await generateEmbedding(text);
+      // Embedding generation removed as we are using keyword search now
+      // const embedding = await generateEmbedding(text);
 
       await Resume.create({
         userId: new mongoose.Types.ObjectId(req.user.id),
         fileName: file.originalname,
         text,
-        embedding,
+        // embedding, // removed
       });
 
       res.status(200).json({ message: "Resume uploaded successfully" });
@@ -156,7 +156,7 @@ router.get('/resumes/:resumeId/content', protect, async (req, res) => {
 
 
 /* =========================
-   ASK ABOUT RESUMES (RAG + GEMINI)
+   ASK ABOUT RESUMES (REGEX KEYWORD + GEMINI)
 ========================= */
 router.post("/ask", protect, async (req, res) => {
   try {
@@ -166,37 +166,103 @@ router.post("/ask", protect, async (req, res) => {
       return res.status(400).json({ message: "Question is required" });
     }
 
-    // 1. Fetch user's resumes with embeddings
+    // 1. Fetch user's resumes
     const resumes = await Resume.find({ userId: req.user.id });
 
     if (resumes.length === 0) {
       return res.status(400).json({ message: "No resumes uploaded." });
     }
 
-    // 2. Generate embedding for the question
-    const questionEmbedding = await generateEmbedding(question);
+    // 2. Extract Keywords (Simple logic)
+    const stopWords = [
+      "the", "and", "or", "a", "an", "is", "are", "was", "were", "has", "have", "had",
+      "do", "does", "did", "will", "would", "could", "should", "may", "might", "must",
+      "be", "been", "being", "am", "it", "its", "this", "that", "these", "those",
+      "who", "what", "which", "where", "when", "why", "how", "all", "each", "every",
+      "both", "few", "more", "most", "other", "some", "such", "no", "not", "only",
+      "same", "so", "than", "too", "very", "just", "but", "if", "then", "else",
+      "with", "from", "for", "of", "to", "in", "on", "at", "by", "about", "into",
+      "through", "during", "before", "after", "above", "below", "between", "under",
+      "again", "further", "once", "here", "there", "any", "can", "show", "me",
+      "resumes", "resume", "skills", "skill", "find", "search", "get", "list", "give",
+      "tell", "me", "about"
+    ];
 
-    // 3. Calculate similarity scores
-    const scoredResumes = resumes.map((resume) => {
-      // If resume has no embedding (old upload), skip or treat as 0
-      if (!resume.embedding || resume.embedding.length === 0) {
-        return { ...resume.toObject(), score: 0 };
+    const keywords = question
+      .toLowerCase()
+      .replace(/[^a-z0-9\s+#.-]/g, " ")
+      .split(/\s+/)
+      .filter(word => word.length > 1 && !stopWords.includes(word));
+
+    // 3. Score Resumes by Regex Keyword Matches
+    let topResumes = [];
+    let matchesDetail = [];
+
+    // Helper to escape regex special characters
+    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    if (keywords.length > 0) {
+      const scoredResumes = resumes.map(resume => {
+        const text = (resume.text || "").toLowerCase();
+        let score = 0;
+        let matchedSkills = [];
+
+        keywords.forEach(kw => {
+          // Use Regex with word boundaries for accurate matching
+          const regex = new RegExp(`\\b${escapeRegExp(kw)}\\b`, 'i');
+          if (regex.test(text)) {
+            score++;
+            matchedSkills.push(kw);
+          }
+        });
+        return {
+          ...resume.toObject(),
+          score,
+          matchedSkills: [...new Set(matchedSkills)] // Remove duplicates
+        };
+      });
+
+      // Filter matches
+      const matches = scoredResumes.filter(r => r.score > 0);
+
+      // Sort descending
+      matches.sort((a, b) => b.score - a.score);
+
+      // [NEW] Best Match Filter: Only keep resumes with the matching score
+      let bestMatches = matches;
+      if (matches.length > 0) {
+        const maxScore = matches[0].score;
+        bestMatches = matches.filter(r => r.score === maxScore);
       }
-      return {
-        ...resume.toObject(),
-        score: cosineSimilarity(questionEmbedding, resume.embedding),
-      };
-    });
 
-    // 4. Sort by score (descending) and take top 3
-    scoredResumes.sort((a, b) => b.score - a.score);
-    const topResumes = scoredResumes.slice(0, 3);
+      // Limit context to top 3 of the best matches
+      topResumes = bestMatches.slice(0, 3);
 
-    // 5. Construct Prompt for Gemini
+      // Prepare detailed matches for frontend (Show ALL best matches, don't slice)
+      matchesDetail = bestMatches.map(m => ({
+        _id: m._id,
+        fileName: m.fileName,
+        score: m.score,
+        matchedSkills: m.matchedSkills
+      }));
+
+    } else {
+      // No specific keywords? Just take the latest 3
+      topResumes = resumes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 3);
+    }
+
+    if (topResumes.length === 0 && keywords.length > 0) {
+      return res.json({
+        answer: `I looked for resumes containing keywords like "${keywords.join(", ")}" but couldn't find any matches.`,
+        matches: []
+      });
+    }
+
+    // 4. Construct Prompt
     const context = topResumes
       .map(
         (r, i) =>
-          `Resume ${i + 1} (${r.fileName}):\n${r.text.slice(0, 3000)}...` // Truncate to avoid huge prompts
+          `Resume ${i + 1} (${r.fileName}):\n${(r.text || "").slice(0, 3000)}...`
       )
       .join("\n\n");
 
@@ -204,7 +270,7 @@ router.post("/ask", protect, async (req, res) => {
       You are an AI assistant analyzing resumes.
       User Question: "${question}"
 
-      Here are the most relevant resumes found:
+      Here are the most relevant resumes found (based on keyword match):
       ${context}
 
       Based ONLY on the provided resumes, answer the user's question.
@@ -212,12 +278,26 @@ router.post("/ask", protect, async (req, res) => {
       Cite the filename when mentioning specific details.
     `;
 
-    // 6. Generate Answer
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const answer = response.text();
+    // 5. Generate Answer with Gemini
+    const result = await ai.models.generateContent({
+      model: GENERATION_MODEL,
+      contents: prompt
+    });
 
-    res.json({ answer });
+    // Check if result.response exists or if result itself is the response
+    // Per new SDK docs:
+    // const response = await ai.models.generateContent(...);
+    // console.log(response.text);
+    // So result IS the response object directly usually, or contains .text() if helper is used?
+    // User snippet: console.log(response.text);
+    // So:
+    const answer = result.text;
+
+    res.json({
+      answer,
+      matches: matchesDetail
+    });
+
   } catch (err) {
     console.error("Ask resume error:", err);
     res.status(500).json({ message: "Failed to process your request" });
