@@ -21,6 +21,11 @@ const Navbar = () => {
   useEffect(() => {
     if (isAuth) {
       fetchResumeCount();
+      const interval = setInterval(fetchResumeCount, 1000);
+
+    // cleanup (VERY IMPORTANT)
+    return () => clearInterval(interval);
+
     }
   }, [isAuth]);
 

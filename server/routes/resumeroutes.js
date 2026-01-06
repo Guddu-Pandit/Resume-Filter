@@ -9,12 +9,26 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const pdfModule = require("pdf-parse");
 const pdfParse = typeof pdfModule === "function" ? pdfModule : pdfModule.default;
-import { ai } from "../config/gemini.js";
+import { ai, EMBEDDING_MODEL_NAME } from "../config/gemini.js";
+import { pineconeIndex } from "../config/pinecone.js";
 
 // Initialize Gemini model (lazily or using shared client)
 // Switching to gemini-2.0-flash-exp as gemini-2.0-flash hit a 0 quota limit
 // In new SDK, we just define the model name string here for usage later.
-const GENERATION_MODEL = "gemini-2.5-flash";
+const GENERATION_MODEL = "gemini-2.0-flash-exp";
+
+async function generateEmbedding(text) {
+  try {
+    const result = await ai.models.embedContent({
+      model: EMBEDDING_MODEL_NAME,
+      contents: [{ parts: [{ text: text.slice(0, 8000) }] }] // Gemini embedding limit is around 10k tokens/chars usually
+    });
+    return result.embeddings[0].values;
+  } catch (error) {
+    console.error("Error generating embedding:", error);
+    return null;
+  }
+}
 
 const router = express.Router();
 
@@ -49,17 +63,37 @@ router.post(
       }
 
       // 🔥 allow multiple resumes per user
-      // Embedding generation removed as we are using keyword search now
-      // const embedding = await generateEmbedding(text);
+      const embedding = await generateEmbedding(text);
 
-      await Resume.create({
+      const newResume = await Resume.create({
         userId: new mongoose.Types.ObjectId(req.user.id),
         fileName: file.originalname,
         text,
-        // embedding, // removed
+        embedding,
       });
 
-      res.status(200).json({ message: "Resume uploaded successfully" });
+      // Upsert to Pinecone if embedding exists
+      if (embedding) {
+        try {
+          await pineconeIndex.upsert([{
+            id: newResume._id.toString(),
+            values: embedding,
+            metadata: {
+              userId: req.user.id,
+              fileName: file.originalname,
+              text: text.slice(0, 1000) // Store a snippet for context, or omit if you prefer fetching from DB
+            }
+          }]);
+        } catch (pcError) {
+          console.error("Pinecone upsert error:", pcError);
+          // Don't fail the whole upload if Pinecone fails, but maybe report it
+        }
+      }
+
+      res.status(200).json({
+        message: "Resume uploaded successfully",
+        resumeId: newResume._id
+      });
     } catch (err) {
       console.error("Resume upload error:", err);
       res.status(500).json({ message: "Upload failed" });
@@ -149,6 +183,13 @@ router.delete('/resumes/:resumeId', protect, async (req, res) => {
       });
     }
 
+    // Delete from Pinecone
+    try {
+      await pineconeIndex.deleteOne(resumeId);
+    } catch (pcError) {
+      console.error("Pinecone delete error:", pcError);
+    }
+
     res.json({
       success: true,
       message: 'Resume deleted successfully'
@@ -201,100 +242,78 @@ router.get('/resumes/:resumeId/content', protect, async (req, res) => {
 ========================= */
 router.post("/ask", protect, async (req, res) => {
   try {
-    const { question } = req.body;
+    const { question, resumeId } = req.body;
 
     if (!question || !question.trim()) {
       return res.status(400).json({ message: "Question is required" });
     }
 
-    // 1. Fetch user's resumes
-    const resumes = await Resume.find({ userId: req.user.id });
+    // 1. Fetch user's resumes (or specific one)
+    const query = { userId: req.user.id };
+    if (resumeId) {
+      if (!mongoose.Types.ObjectId.isValid(resumeId)) {
+        return res.status(400).json({ message: "Invalid resume ID" });
+      }
+      query._id = resumeId;
+    }
+    const resumes = await Resume.find(query);
 
     if (resumes.length === 0) {
       return res.status(400).json({ message: "No resumes uploaded." });
     }
 
-    // 2. Extract Keywords (Simple logic)
-    const stopWords = [
-      "the", "and", "or", "a", "an", "is", "are", "was", "were", "has", "have", "had",
-      "do", "does", "did", "will", "would", "could", "should", "may", "might", "must",
-      "be", "been", "being", "am", "it", "its", "this", "that", "these", "those",
-      "who", "what", "which", "where", "when", "why", "how", "all", "each", "every",
-      "both", "few", "more", "most", "other", "some", "such", "no", "not", "only",
-      "same", "so", "than", "too", "very", "just", "but", "if", "then", "else",
-      "with", "from", "for", "of", "to", "in", "on", "at", "by", "about", "into",
-      "through", "during", "before", "after", "above", "below", "between", "under",
-      "again", "further", "once", "here", "there", "any", "can", "show", "me",
-      "resumes", "resume", "skills", "skill", "find", "search", "get", "list", "give",
-      "tell", "me", "about"
-    ];
+    // 2. Generate Embedding for Question
+    const questionEmbedding = await generateEmbedding(question);
 
-    const keywords = question
-      .toLowerCase()
-      .replace(/[^a-z0-9\s+#.-]/g, " ")
-      .split(/\s+/)
-      .filter(word => word.length > 1 && !stopWords.includes(word));
-
-    // 3. Score Resumes by Regex Keyword Matches
     let topResumes = [];
     let matchesDetail = [];
 
-    // Helper to escape regex special characters
-    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    if (keywords.length > 0) {
-      const scoredResumes = resumes.map(resume => {
-        const text = (resume.text || "").toLowerCase();
-        let score = 0;
-        let matchedSkills = [];
-
-        keywords.forEach(kw => {
-          // Use Regex with word boundaries for accurate matching
-          const regex = new RegExp(`\\b${escapeRegExp(kw)}\\b`, 'i');
-          if (regex.test(text)) {
-            score++;
-            matchedSkills.push(kw);
-          }
+    if (questionEmbedding) {
+      // 3. Query Pinecone
+      try {
+        const queryResponse = await pineconeIndex.query({
+          vector: questionEmbedding,
+          topK: 5,
+          filter: { userId: { $eq: req.user.id } },
+          includeMetadata: true,
         });
-        return {
-          ...resume.toObject(),
-          score,
-          matchedSkills: [...new Set(matchedSkills)] // Remove duplicates
-        };
-      });
 
-      // Filter matches
-      const matches = scoredResumes.filter(r => r.score > 0);
+        if (queryResponse.matches && queryResponse.matches.length > 0) {
+          const matchIds = queryResponse.matches.map(m => new mongoose.Types.ObjectId(m.id));
 
-      // Sort descending
-      matches.sort((a, b) => b.score - a.score);
+          // Fetch full resume documents from MongoDB to get full text
+          const matchedResumes = await Resume.find({
+            _id: { $in: matchIds }
+          });
 
-      // [NEW] Best Match Filter: Only keep resumes with the matching score
-      let bestMatches = matches;
-      if (matches.length > 0) {
-        const maxScore = matches[0].score;
-        bestMatches = matches.filter(r => r.score === maxScore);
+          // Order by similarity score from Pinecone
+          topResumes = queryResponse.matches.map(match => {
+            const resumeDoc = matchedResumes.find(r => r._id.toString() === match.id);
+            if (resumeDoc) {
+              return {
+                ...resumeDoc.toObject(),
+                score: match.score
+              };
+            }
+            return null;
+          }).filter(r => r !== null);
+
+          matchesDetail = topResumes.map(m => ({
+            _id: m._id,
+            fileName: m.fileName,
+            score: (m.score * 100).toFixed(2) + "%" // Convert to readable percentage
+          }));
+        }
+      } catch (pcError) {
+        console.error("Pinecone query error:", pcError);
+        // Fallback to keyword search if Pinecone fails? 
+        // For now, let's just proceed with empty topResumes or handle specifically
       }
-
-      // Limit context to top 3 of the best matches
-      topResumes = bestMatches.slice(0, 3);
-
-      // Prepare detailed matches for frontend (Show ALL best matches, don't slice)
-      matchesDetail = bestMatches.map(m => ({
-        _id: m._id,
-        fileName: m.fileName,
-        score: m.score,
-        matchedSkills: m.matchedSkills
-      }));
-
-    } else {
-      // No specific keywords? Just take the latest 3
-      topResumes = resumes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 3);
     }
 
-    if (topResumes.length === 0 && keywords.length > 0) {
+    if (topResumes.length === 0) {
       return res.json({
-        answer: `I looked for resumes containing keywords like "${keywords.join(", ")}" but couldn't find any matches.`,
+        answer: `I couldn't find any resumes matching your question.`,
         matches: []
       });
     }

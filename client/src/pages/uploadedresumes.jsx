@@ -137,7 +137,7 @@ const UploadedResumes = () => {
 
                 {/* Upload Section */}
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 mb-6">
-                    <div className="flex flex-col md:flex-row gap-4 items-center">
+                    <div className="flex flex-col md:flex-col gap-4 items-center">
                         <label className="flex-1 w-full flex items-center justify-center border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-[#00a86b]/50 hover:bg-slate-50 transition-all p-6">
                             <input
                                 type="file"
@@ -162,7 +162,7 @@ const UploadedResumes = () => {
                         <button
                             onClick={handleUpload}
                             disabled={uploading || selectedFiles.length === 0}
-                            className="px-6 py-3 bg-[#00a86b] text-white font-semibold rounded-xl shadow-lg shadow-[#00a86b]/20 hover:bg-[#008f5a] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-6 py-3 w-full bg-[#00a86b] text-center justify-center items-center text-white font-semibold rounded-xl shadow-lg shadow-[#00a86b]/20 hover:bg-[#008f5a] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex gap-2"
                         >
                             {uploading ? (
                                 <>
