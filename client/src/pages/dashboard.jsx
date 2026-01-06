@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef, useContext } from "react";
-import { askResume, getMyResumes, getResumeContent } from "../api/authapi";
-import { Send, Sparkles, Eye, X, Loader2, MessageSquare, User } from "lucide-react";
-import Modal from "../components/ui/Modal";
+import { askResume, getMyResumes, getResumeContent, uploadResume } from "../api/authapi";
+import { Send, Eye, X, Loader2, Plus, Copy, FileText, Trash2 } from "lucide-react";
 import { useToast } from "../context/ToastContext";
 import { AuthContext } from "../context/authcontext";
 
@@ -15,8 +14,11 @@ const Dashboard = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [resumeContent, setResumeContent] = useState("");
   const [previewMeta, setPreviewMeta] = useState({ id: null, fileName: "" });
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -27,6 +29,26 @@ const Dashboard = () => {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Handle file selection
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        addToast("File too large. Max 5MB allowed.", "error");
+        return;
+      }
+      setAttachedFile(file);
+    }
+  };
+
+  // Remove attached file
+  const removeAttachedFile = () => {
+    setAttachedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   // Handle preview
   const handlePreview = async (resumeId, fileName) => {
@@ -44,6 +66,12 @@ const Dashboard = () => {
     }
   };
 
+  // Copy text to clipboard
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
+    addToast("Copied to clipboard", "success");
+  };
+
   // Check if message is a greeting
   const isGreeting = (text) => {
     const greetings = ["hi", "hello", "hey", "hii", "hiii", "hola", "good morning", "good afternoon", "good evening"];
@@ -52,18 +80,26 @@ const Dashboard = () => {
 
   // Handle send message
   const handleSend = async () => {
-    if (!inputValue.trim() || loading) return;
+    if ((!inputValue.trim() && !attachedFile) || loading) return;
 
     const userMessage = inputValue.trim();
+    const fileToUpload = attachedFile;
+
     setInputValue("");
+    setAttachedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
 
-    // Add user message
-    setMessages(prev => [...prev, { type: "user", content: userMessage }]);
+    // Add user message with attachment info
+    const userMsgContent = fileToUpload
+      ? `${userMessage || "Analyze this resume"}\n\n📎 Attached: ${fileToUpload.name}`
+      : userMessage;
 
-    // Check for greeting
-    if (isGreeting(userMessage)) {
+    setMessages(prev => [...prev, { type: "user", content: userMsgContent }]);
+
+    // Check for greeting (only if no file attached)
+    if (!fileToUpload && isGreeting(userMessage)) {
       const userName = user?.name || "there";
-      const greetingResponse = `Hello, ${userName}! 👋 How can I help you today? You can ask me to search for specific skills in your uploaded resumes, like "Find candidates with React experience" or "Show me Python developers."`;
+      const greetingResponse = `Hello 👋\nHow can I help you today with resumes?\n\nYou can:\n• Click the + button to upload a resume and ask questions about it\n• Ask me to find candidates with specific skills from your uploaded resumes`;
       setMessages(prev => [...prev, { type: "assistant", content: greetingResponse }]);
       return;
     }
@@ -71,19 +107,50 @@ const Dashboard = () => {
     setLoading(true);
 
     try {
-      const res = await askResume({ question: userMessage });
-      const answer = res.data.answer;
-      const matches = res.data.matches || [];
+      // If file is attached, upload it first
+      if (fileToUpload) {
+        setUploading(true);
+        const formData = new FormData();
+        formData.append("resume", fileToUpload);
 
-      setMessages(prev => [...prev, {
-        type: "assistant",
-        content: answer,
-        matches: matches
-      }]);
+        try {
+          await uploadResume(formData);
+          addToast(`Uploaded ${fileToUpload.name}`, "success");
+        } catch (uploadErr) {
+          setMessages(prev => [...prev, {
+            type: "assistant",
+            content: `Failed to upload ${fileToUpload.name}. Please try again.`
+          }]);
+          setLoading(false);
+          setUploading(false);
+          return;
+        }
+        setUploading(false);
+      }
+
+      // Now ask the question
+      const questionToAsk = userMessage || (fileToUpload ? `Summarize the key skills and experience from the resume ${fileToUpload.name}` : "");
+
+      if (questionToAsk) {
+        const res = await askResume({ question: questionToAsk });
+        const answer = res.data.answer;
+        const matches = res.data.matches || [];
+
+        setMessages(prev => [...prev, {
+          type: "assistant",
+          content: answer,
+          matches: matches
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          type: "assistant",
+          content: "Resume uploaded successfully! You can now ask questions about it."
+        }]);
+      }
     } catch (err) {
       setMessages(prev => [...prev, {
         type: "assistant",
-        content: err.response?.data?.message || "Sorry, I couldn't process your request. Please make sure you have uploaded some resumes first."
+        content: err.response?.data?.message || "Sorry, I couldn't process your request. Please try again."
       }]);
     } finally {
       setLoading(false);
@@ -99,103 +166,95 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-[#00a86b]/10 to-[#fefefe] pt-20 font-['Inter',sans-serif] flex flex-col">
+    <div className="min-h-screen bg-white pt-20 font-['Inter',sans-serif] flex flex-col">
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
 
       {/* Chat Container */}
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4">
+      <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full px-4">
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto py-6 space-y-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto py-6 space-y-6 custom-scrollbar">
           {messages.length === 0 ? (
             // Empty State
             <div className="h-full flex flex-col items-center justify-center text-center px-4">
-              <div className="w-20 h-20 bg-[#00a86b]/10 rounded-2xl flex items-center justify-center mb-6">
-                <Sparkles className="w-10 h-10 text-[#00a86b]" />
-              </div>
-              <h1 className="text-3xl font-bold text-slate-800 mb-3">
-                Resume Intelligence
+              <h1 className="text-3xl font-medium text-slate-800 mb-4">
+                What's on the agenda today?
               </h1>
-              <p className="text-slate-500 max-w-md mb-8">
-                Ask questions about your uploaded resumes. I can help you find candidates with specific skills or experience.
+              <p className="text-slate-500 text-sm mb-6">
+                Ask about your resumes or click + to upload a new one
               </p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {["Find React developers", "Who has Python experience?", "Show me senior engineers"].map((suggestion, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setInputValue(suggestion)}
-                    className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 hover:border-[#00a86b]/50 hover:text-[#00a86b] transition-colors"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
             </div>
           ) : (
             // Messages List
             messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex gap-3 ${msg.type === "user" ? "justify-end" : "justify-start"}`}
-              >
-                {msg.type === "assistant" && (
-                  <div className="w-8 h-8 rounded-full bg-[#00a86b]/10 flex items-center justify-center shrink-0">
-                    <Sparkles className="w-4 h-4 text-[#00a86b]" />
-                  </div>
-                )}
-
-                <div className={`max-w-[80%] ${msg.type === "user" ? "order-first" : ""}`}>
-                  <div className={`px-4 py-3 rounded-2xl ${msg.type === "user"
-                      ? "bg-[#00a86b] text-white rounded-br-md"
-                      : "bg-white border border-slate-100 shadow-sm text-slate-700 rounded-bl-md"
-                    }`}>
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                  </div>
-
-                  {/* Matches */}
-                  {msg.matches && msg.matches.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {msg.matches.map((match) => (
-                        <div
-                          key={match._id}
-                          className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 shadow-sm hover:border-[#00a86b]/30 transition-colors"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-lg">📄</span>
-                            <span className="font-medium text-slate-700 truncate">{match.fileName}</span>
-                          </div>
-                          <button
-                            onClick={() => handlePreview(match._id, match.fileName)}
-                            className="p-2 bg-slate-50 hover:bg-[#00a86b] text-slate-500 hover:text-white rounded-lg transition-colors"
-                            title="Preview"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+              <div key={idx} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {msg.type === "user" ? (
+                  // User Message
+                  <div className="flex justify-end">
+                    <div className="bg-slate-100 text-slate-800 px-4 py-2.5 rounded-2xl max-w-[80%]">
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  // Assistant Message
+                  <div className="space-y-3">
+                    <div className="text-slate-700 leading-relaxed">
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    </div>
 
-                {msg.type === "user" && (
-                  <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
-                    <User className="w-4 h-4 text-white" />
+                    {/* Matches */}
+                    {msg.matches && msg.matches.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {msg.matches.map((match) => (
+                          <button
+                            key={match._id}
+                            onClick={() => handlePreview(match._id, match.fileName)}
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-700 transition-colors"
+                          >
+                            <span>📄</span>
+                            <span className="max-w-[150px] truncate">{match.fileName}</span>
+                            <Eye className="w-3.5 h-3.5 text-slate-400" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-1 mt-3 text-slate-400">
+                      <button
+                        onClick={() => handleCopy(msg.content)}
+                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                        title="Copy"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             ))
           )}
 
-          {/* Loading indicator */}
+          {/* Thinking indicator */}
           {loading && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#00a86b]/10 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-[#00a86b]" />
-              </div>
-              <div className="px-4 py-3 bg-white border border-slate-100 shadow-sm rounded-2xl rounded-bl-md">
-                <div className="flex items-center gap-2 text-slate-500">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Thinking...</span>
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex items-center gap-2 text-slate-500">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-[#00a86b] rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                  <span className="w-2 h-2 bg-[#00a86b] rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                  <span className="w-2 h-2 bg-[#00a86b] rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
                 </div>
+                <span className="text-sm font-medium">
+                  {uploading ? "Uploading..." : "Thinking..."}
+                </span>
               </div>
             </div>
           )}
@@ -204,28 +263,55 @@ const Dashboard = () => {
         </div>
 
         {/* Input Area */}
-        <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-4 pb-6">
-          <div className="flex gap-3 items-end">
-            <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm focus-within:border-[#00a86b] focus-within:ring-2 focus-within:ring-[#00a86b]/20 transition-all">
-              <textarea
-                ref={inputRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask about your resumes..."
-                rows={1}
-                className="w-full px-4 py-3 bg-transparent resize-none focus:outline-none text-slate-700 placeholder:text-slate-400"
-                style={{ minHeight: "48px", maxHeight: "120px" }}
-              />
+        <div className="sticky bottom-0 bg-white pt-4 pb-6">
+          {/* Attached File Preview */}
+          {attachedFile && (
+            <div className="mb-3 flex items-center gap-2 px-4 py-2 bg-[#00a86b]/5 border border-[#00a86b]/20 rounded-xl">
+              <FileText className="w-4 h-4 text-[#00a86b]" />
+              <span className="text-sm text-slate-700 flex-1 truncate">{attachedFile.name}</span>
+              <button
+                onClick={removeAttachedFile}
+                className="p-1 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
+          )}
+
+          <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-full focus-within:border-[#00a86b] focus-within:ring-2 focus-within:ring-[#00a86b]/20 transition-all">
+            {/* Plus button - Upload */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
+              title="Upload resume"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+
+            {/* Input */}
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={attachedFile ? "Ask about this resume..." : "Ask anything"}
+              className="flex-1 bg-transparent px-2 py-2 focus:outline-none text-slate-700 placeholder:text-slate-400"
+            />
+
+            {/* Send button */}
             <button
               onClick={handleSend}
-              disabled={!inputValue.trim() || loading}
-              className="p-3 bg-[#00a86b] text-white rounded-xl shadow-lg shadow-[#00a86b]/20 hover:bg-[#008f5a] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={(!inputValue.trim() && !attachedFile) || loading}
+              className="p-2.5 bg-[#00a86b] text-white rounded-full hover:bg-[#008f5a] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Send className="w-5 h-5" />
+              <Send className="w-4 h-4" />
             </button>
           </div>
+
+          <p className="text-xs text-center text-slate-400 mt-3">
+            Click + to upload a resume, then ask questions about it
+          </p>
         </div>
       </div>
 
@@ -286,11 +372,11 @@ const Dashboard = () => {
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: #cbd5e1;
+          background-color: #e2e8f0;
           border-radius: 20px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background-color: #94a3b8;
+          background-color: #cbd5e1;
         }
       `}</style>
     </div>
