@@ -1,18 +1,36 @@
 import { useContext, useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/authcontext";
-import { UserCircle, LogOut, FileSearch, ChevronDown } from "lucide-react";
+import { UserCircle, LogOut, FileSearch, FileText } from "lucide-react";
+import { getMyResumes } from "../api/authapi";
 
 const Navbar = () => {
   const { isAuth, user, logoutUser } = useContext(AuthContext);
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [resumeCount, setResumeCount] = useState(0);
   const dropdownRef = useRef(null);
 
   const handleLogout = () => {
     logoutUser();
     setShowDropdown(false);
     navigate("/");
+  };
+
+  // Fetch resume count when authenticated
+  useEffect(() => {
+    if (isAuth) {
+      fetchResumeCount();
+    }
+  }, [isAuth]);
+
+  const fetchResumeCount = async () => {
+    try {
+      const res = await getMyResumes();
+      setResumeCount(res.data.count || 0);
+    } catch (err) {
+      console.error("Error fetching resume count:", err);
+    }
   };
 
   // Close dropdown when clicking outside
@@ -70,6 +88,23 @@ const Navbar = () => {
                         </p>
                       </div>
 
+                      {/* Uploaded Resumes Link */}
+                      <Link
+                        to="/uploaded-resumes"
+                        onClick={() => setShowDropdown(false)}
+                        className="flex items-center justify-between px-4 py-3 text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-5 h-5 text-[#00a86b]" />
+                          <span className="font-medium">Uploaded Resumes</span>
+                        </div>
+                        {resumeCount > 0 && (
+                          <span className="bg-[#00a86b]/10 text-[#00a86b] text-xs px-2 py-0.5 rounded-full font-bold">
+                            {resumeCount}
+                          </span>
+                        )}
+                      </Link>
+
                       {/* Resume Analyzer Link */}
                       <Link
                         to="/resume-analyzer"
@@ -83,7 +118,7 @@ const Navbar = () => {
                       {/* Logout */}
                       <button
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors border-t border-slate-100 mt-1"
                       >
                         <LogOut className="w-5 h-5" />
                         <span className="font-medium">Logout</span>

@@ -5,6 +5,7 @@ import Login from "./pages/login";
 import Signup from "./pages/signup";
 import Dashboard from "./pages/dashboard";
 import ResumeAnalyzer from "./pages/resumeanalyzer";
+import UploadedResumes from "./pages/uploadedresumes";
 import ProtectedRoute from "./components/protectedroute";
 import "./index.css";
 
@@ -29,6 +30,14 @@ const App = () => {
           element={
             <ProtectedRoute>
               <ResumeAnalyzer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/uploaded-resumes"
+          element={
+            <ProtectedRoute>
+              <UploadedResumes />
             </ProtectedRoute>
           }
         />

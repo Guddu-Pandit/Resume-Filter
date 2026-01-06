@@ -68,6 +68,47 @@ router.post(
 );
 
 /* =========================
+   EXTRACT TEXT FROM FILE (No save)
+========================= */
+router.post(
+  "/extract-text",
+  protect,
+  upload.single("resume"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const file = req.file;
+      let text = "";
+
+      if (file.mimetype === "application/pdf") {
+        const data = await pdfParse(file.buffer);
+        text = data.text || "";
+      } else if (
+        file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        file.originalname.endsWith(".docx")
+      ) {
+        const result = await mammoth.extractRawText({
+          buffer: file.buffer,
+        });
+        text = result.value || "";
+      } else if (file.mimetype === "text/plain" || file.originalname.endsWith(".txt")) {
+        text = file.buffer.toString("utf-8");
+      } else {
+        return res.status(400).json({ message: "Unsupported file type" });
+      }
+
+      res.json({ text });
+    } catch (err) {
+      console.error("Extract text error:", err);
+      res.status(500).json({ message: "Failed to extract text" });
+    }
+  }
+);
+
+/* =========================
    GET USER RESUMES
 ========================= */
 router.get("/my-resumes", protect, async (req, res) => {
