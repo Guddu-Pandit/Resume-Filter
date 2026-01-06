@@ -399,4 +399,84 @@ router.post("/ask", protect, async (req, res) => {
 });
 */
 
+/* =========================
+   ANALYZE SINGLE RESUME
+========================= */
+router.post("/analyze-single", protect, async (req, res) => {
+  try {
+    const { resumeText } = req.body;
+
+    if (!resumeText || !resumeText.trim()) {
+      return res.status(400).json({ message: "Resume text is required" });
+    }
+
+    const prompt = `
+You are an expert resume reviewer and career coach. Analyze the following resume and provide a comprehensive assessment.
+
+Resume:
+${resumeText}
+
+Provide your analysis in the following JSON format ONLY (no markdown, no code blocks, just pure JSON):
+{
+  "score": <number between 0-100>,
+  "summary": "<2-3 sentence overall summary>",
+  "strengths": [
+    "<strength 1>",
+    "<strength 2>",
+    "<strength 3>"
+  ],
+  "improvements": [
+    "<improvement suggestion 1>",
+    "<improvement suggestion 2>",
+    "<improvement suggestion 3>"
+  ],
+  "missing": [
+    "<missing section or element 1>",
+    "<missing section or element 2>"
+  ]
+}
+
+Focus on:
+- Contact information completeness
+- Work experience clarity and impact
+- Skills section presence and relevance
+- Education details
+- Formatting and readability
+- Quantifiable achievements
+- Keywords for ATS systems
+`;
+
+    const result = await ai.models.generateContent({
+      model: GENERATION_MODEL,
+      contents: prompt
+    });
+
+    const responseText = result.text;
+
+    // Try to parse JSON from the response
+    let analysis;
+    try {
+      // Remove any markdown code blocks if present
+      let cleanedText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      analysis = JSON.parse(cleanedText);
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      // Return a fallback response if JSON parsing fails
+      analysis = {
+        score: 50,
+        summary: responseText.slice(0, 200),
+        strengths: ["Resume submitted for analysis"],
+        improvements: ["Could not parse detailed feedback - please try again"],
+        missing: []
+      };
+    }
+
+    res.json({ analysis });
+
+  } catch (err) {
+    console.error("Analyze resume error:", err);
+    res.status(500).json({ message: "Failed to analyze resume" });
+  }
+});
+
 export default router;
