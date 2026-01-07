@@ -131,7 +131,7 @@ const Dashboard = () => {
       const res = await getMyResumes();
       setUserResumes(res.data.resumes || []);
     } catch (err) {
-      console.error("Error fetching resumes:", err);
+      console.log("Error fetching resumes:", err);
     }
   };
 

@@ -333,11 +333,32 @@ router.post("/ask", protect, async (req, res) => {
             return null;
           }).filter(r => r !== null);
 
+          // --- REFINEMENT LOGIC ---
+          // 1. Filter by threshold (e.g. 45% similarity)
+          const MIN_SCORE = 0.45;
+          topResumes = topResumes.filter(r => r.score >= MIN_SCORE);
+
+          // 2. Dominance check: If top match is >80% and 2nd is <50%, or if gap is >25%, show only top
+          if (topResumes.length > 1) {
+            const topScore = topResumes[0].score;
+            const secondScore = topResumes[1].score;
+            if ((topScore > 0.70 && secondScore < 0.45) || (topScore - secondScore > 0.25)) {
+              topResumes = [topResumes[0]];
+            }
+          }
+
           matchesDetail = topResumes.map(m => ({
             _id: m._id,
             fileName: m.fileName,
             score: (m.score * 100).toFixed(2) + "%"
           }));
+
+          // 3. Procedural Suppression: Don't show resume buttons if asking about process/tools
+          const proceduralKeywords = ["how did you find", "tool call", "process", "where did you get", "how you find"];
+          if (proceduralKeywords.some(k => question.toLowerCase().includes(k))) {
+            matchesDetail = [];
+          }
+          // ------------------------
         }
       } catch (pcError) {
         console.error("Pinecone query error:", pcError);
@@ -361,7 +382,7 @@ router.post("/ask", protect, async (req, res) => {
       )
       .join("\n\n");
 
-      const systemInstruction = `
+    const systemInstruction = `
       You are a precise AI assistant specialized in analyzing and extracting information from resumes. Your responses must be factual, professional, and based EXCLUSIVELY on the provided resume content.
 
       User Question: "${question}"
@@ -372,9 +393,8 @@ router.post("/ask", protect, async (req, res) => {
       INSTRUCTIONS:
       - Answer the user's question USING ONLY information explicitly stated in the provided resumes. Do NOT add, assume, or infer any details not directly present.
       - If the question cannot be fully answered with the provided resumes, state clearly what is available and note what is missing. If no relevant information exists, respond: "I cannot find that information in the provided resumes."
-      - When referencing specific details (e.g., experience, skills, education, dates), ALWAYS cite the source by including the filename in parentheses.
       - If multiple resumes contain relevant information, compare or combine them as needed, citing each accordingly.
-      - For questions about your process, tool usage, or how results were retrieved (e.g., "how did you find this", "tool calls"), respond: "I used the **generateEmbedding** and **queryPinecone** tools to perform a semantic search across the resume database and retrieve the most relevant matches."
+      - For questions about your process,tool calling, tool usage, or how results were retrieved (e.g., "how did you find this", "tool calls"), respond: "I used the **generateEmbedding** and **queryPinecone** tools to perform a semantic search across the resume database and retrieve the most relevant matches."
       - Do NOT mention any other tools, internal processes, or external knowledge unless explicitly asked about the above.
       - Use clear Markdown formatting for readability:
         - Headings (#, ##) for sections
@@ -383,7 +403,7 @@ router.post("/ask", protect, async (req, res) => {
         - Tables if comparing multiple candidates
         - Blockquotes for direct quotes from resumes if helpful
       - Keep responses concise, objective, and directly relevant to the question.
-      `;  
+      `;
 
     // 5. Generate Answer with Gemini using History Context
     // Format history if it exists
@@ -404,9 +424,21 @@ router.post("/ask", protect, async (req, res) => {
 
     const answer = result.text;
 
+    // --- CITE-CHECK FILTERING (NEW) ---
+    // Only show resume buttons for files the AI actually mentioned in its response.
+    // This prevents "semantic noise" from Pinecone showing up in the UI.
+    let filteredMatches = matchesDetail;
+    if (matchesDetail.length > 0 && answer) {
+      filteredMatches = matchesDetail.filter(m =>
+        answer.includes(m.fileName) ||
+        answer.toLowerCase().includes(m.fileName.toLowerCase())
+      );
+    }
+    // ----------------------------------
+
     res.json({
       answer,
-      matches: matchesDetail,
+      matches: filteredMatches,
       systemPrompt: systemInstruction, // Send this back so frontend can store/log it
       toolCalls // Provide clinical details of internal steps
     });
@@ -523,7 +555,7 @@ router.post("/analyze-single", protect, async (req, res) => {
       return res.status(400).json({ message: "Resume text is required" });
     }
 
-const prompt = `
+    const prompt = `
 You are an expert resume reviewer and senior career coach with deep knowledge of modern hiring practices, Applicant Tracking Systems (ATS), and industry standards across tech, finance, marketing, and other professional fields.
 
 Your task is to carefully analyze the provided resume and deliver a structured, objective, and actionable assessment.

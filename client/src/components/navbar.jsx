@@ -34,7 +34,7 @@ const Navbar = () => {
       const res = await getMyResumes();
       setResumeCount(res.data.count || 0);
     } catch (err) {
-      console.error("Error fetching resume count:", err);
+      console.log("Error fetching resume count:", err);
     }
   };
 
