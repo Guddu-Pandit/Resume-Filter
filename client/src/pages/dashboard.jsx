@@ -35,7 +35,7 @@ const TypewriterMessage = ({ text, onComplete }) => {
   }, [index, text, onComplete]);
 
   return (
-    <div className="prose prose-slate prose-sm max-w-none prose-p:mb-0 prose-p:mt-3 prose-headings:mt-6 prose-headings:mb-2 prose-ul:my-2 prose-li:my-0.5 leading-tight">
+    <div className="prose prose-slate prose-sm max-w-none prose-p:my-4 prose-headings:mb-2 prose-headings:mt-8 prose-ul:my-3 prose-li:my-1.5 leading-normal">
       <ReactMarkdown>{displayedText}</ReactMarkdown>
     </div>
   );
@@ -357,7 +357,7 @@ const Dashboard = () => {
                       {msg.isTyping ? (
                         <TypewriterMessage text={msg.content} onComplete={() => handleTypingComplete(idx)} />
                       ) : (
-                        <div className="prose prose-slate prose-sm max-w-none prose-p:mb-0 prose-p:mt-3 prose-headings:mt-6 prose-headings:mb-2 prose-ul:my-2 prose-li:my-0.5 leading-tight">
+                        <div className="prose prose-slate prose-sm max-w-none prose-p:my-4 prose-headings:mb-2 prose-headings:mt-8 prose-ul:my-3 prose-li:my-1.5 leading-normal">
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
                       )}
@@ -615,18 +615,30 @@ const Dashboard = () => {
         }
 
         /* Spacing for bold headers and section titles */
-        .prose p strong:first-child {
-          margin-top: 1.25rem;
-          display: inline-block;
+        .prose p strong:first-child,
+        .prose li strong:first-child {
+          margin-top: 1.5rem;
+          margin-bottom: 0.5rem;
+          display: block;
         }
         
-        /* Ensure specific spacing for lines that start with bold text (common in resumes) */
+        /* Ensure specific spacing for lines that start with bold text */
         .prose p:has(> strong:first-child) {
-          margin-top: 1rem;
+          margin-top: 2rem;
+          margin-bottom: 1rem;
         }
 
-        /* Tighten lines within lists but allow space between lists */
+        .prose p {
+          margin-top: 1rem;
+          margin-bottom: 1rem;
+        }
+
+        /* Spacing for lists */
         .prose ul, .prose ol {
+          margin-top: 1.25rem;
+          margin-bottom: 1.25rem;
+        }
+        .prose li {
           margin-top: 0.5rem;
           margin-bottom: 0.5rem;
         }

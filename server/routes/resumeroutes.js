@@ -14,8 +14,9 @@ import { pineconeIndex } from "../config/pinecone.js";
 
 // Initialize Gemini model (lazily or using shared client)
 // Switching to gemini-2.0-flash-exp as gemini-2.0-flash hit a 0 quota limit
+// gemini-2.5-flash-lite is a lite version of gemini-2.5-flash and gemini-2.5-flash-exp
 // In new SDK, we just define the model name string here for usage later.
-const GENERATION_MODEL = "gemini-2.5-flash";
+const GENERATION_MODEL = "gemini-2.5-flash-lite";
 
 async function generateEmbedding(text) {
   try {
@@ -44,6 +45,44 @@ const cleanText = (text) => {
 
   return cleaned.trim();
 };
+
+// yaha se add kiya hai
+/* =========================
+   RESUME INTENT DETECTION (NEW)
+========================= */
+function isResumeQuestion(question) {
+  if (!question) return false;
+
+  const resumeKeywords = [
+    "resume",
+    "resumes",
+    "cv",
+    "candidate",
+    "profile",
+    "experience",
+    "years",
+    "skills",
+    "skill",
+    "developer",
+    "engineer",
+    "frontend",
+    "backend",
+    "fullstack",
+    "react",
+    "node",
+    "java",
+    "python",
+    "project",
+    "projects",
+    "work",
+    "company",
+    "companies"
+  ];
+
+  const q = question.toLowerCase();
+  return resumeKeywords.some(k => q.includes(k));
+}
+//yaha tak
 
 const router = express.Router();
 
@@ -252,6 +291,196 @@ router.get('/resumes/:resumeId/content', protect, async (req, res) => {
 });
 
 
+
+/* =========================
+   ASK ABOUT RESUMES (REGEX KEYWORD + GEMINI)
+========================= */
+// router.post("/ask", protect, async (req, res) => {
+//   try {
+//     const { question, resumeId, history } = req.body;
+
+//     if (!question || !question.trim()) {
+//       return res.status(400).json({ message: "Question is required" });
+//     }
+
+//     const toolCalls = [];
+
+//     // 1. Fetch user's resumes (or specific one)
+//     const query = { userId: req.user.id };
+//     if (resumeId) {
+//       if (mongoose.Types.ObjectId.isValid(resumeId)) {
+//         query._id = resumeId;
+//       }
+//     }
+//     const resumes = await Resume.find(query);
+
+//     if (resumes.length === 0) {
+//       return res.status(400).json({ message: "No resumes uploaded." });
+//     }
+
+//     // 2. Generate Embedding for Question
+//     const questionEmbedding = await generateEmbedding(question);
+//     toolCalls.push({
+//       tool: "generateEmbedding",
+//       input: question.slice(0, 50) + (question.length > 50 ? "..." : ""),
+//       status: questionEmbedding ? "success" : "failed",
+//       details: "Generated 768-dimension vector for query"
+//     });
+
+//     let topResumes = [];
+//     let matchesDetail = [];
+
+//     if (questionEmbedding) {
+//       // 3. Query Pinecone
+//       try {
+//         const queryFilter = { userId: { $eq: req.user.id } };
+//         // If searching a specific resume, restrict Pinecone query too
+//         if (resumeId) {
+//           queryFilter._id = { $eq: resumeId };
+//         }
+
+//         const queryResponse = await pineconeIndex.query({
+//           vector: questionEmbedding,
+//           topK: 5,
+//           filter: queryFilter,
+//           includeMetadata: true,
+//         });
+
+//         toolCalls.push({
+//           tool: "queryPinecone",
+//           filters: queryFilter,
+//           matchCount: queryResponse.matches?.length || 0,
+//           status: "success"
+//         });
+
+//         if (queryResponse.matches && queryResponse.matches.length > 0) {
+//           const matchIds = queryResponse.matches.map(m => new mongoose.Types.ObjectId(m.id));
+
+//           // Fetch full resume documents from MongoDB to get full text
+//           const matchedResumes = await Resume.find({
+//             _id: { $in: matchIds }
+//           });
+
+//           // Order by similarity score from Pinecone
+//           topResumes = queryResponse.matches.map(match => {
+//             const resumeDoc = matchedResumes.find(r => r._id.toString() === match.id);
+//             if (resumeDoc) {
+//               return {
+//                 ...resumeDoc.toObject(),
+//                 score: match.score
+//               };
+//             }
+//             return null;
+//           }).filter(r => r !== null);
+
+//           // --- REFINEMENT LOGIC ---
+//           // 1. Filter by threshold (e.g. 45% similarity)
+//           const MIN_SCORE = 0.45;
+//           topResumes = topResumes.filter(r => r.score >= MIN_SCORE);
+
+//           // 2. Dominance check: If top match is >80% and 2nd is <50%, or if gap is >25%, show only top
+//           if (topResumes.length > 1) {
+//             const topScore = topResumes[0].score;
+//             const secondScore = topResumes[1].score;
+//             if ((topScore > 0.70 && secondScore < 0.45) || (topScore - secondScore > 0.25)) {
+//               topResumes = [topResumes[0]];
+//             }
+//           }
+
+//           matchesDetail = topResumes.map(m => ({
+//             _id: m._id,
+//             fileName: m.fileName,
+//             score: (m.score * 100).toFixed(2) + "%"
+//           }));
+
+//           // 3. Procedural Suppression: Don't show resume buttons if asking about process/tools
+//           const proceduralKeywords = ["how did you find", "tool call", "process", "where did you get", "how you find"];
+//           if (proceduralKeywords.some(k => question.toLowerCase().includes(k))) {
+//             matchesDetail = [];
+//           }
+//           // ------------------------
+//         }
+//       } catch (pcError) {
+//         console.error("Pinecone query error:", pcError);
+//         toolCalls.push({ tool: "queryPinecone", status: "error", error: pcError.message });
+//       }
+//     }
+
+//     if (topResumes.length === 0) {
+//       return res.json({
+//         answer: I couldn't find any resumes matching your question.,
+//         matches: [],
+//         toolCalls
+//       });
+//     }
+
+//     // 4. Construct Prompt
+//     const contextText = topResumes
+//       .map(
+//         (r, i) =>
+//           Resume ${i + 1} (${r.fileName}):\n${(r.text || "").slice(0, 3000)}...
+//       )
+//       .join("\n\n");
+
+//     const systemInstruction = `
+//       You are a precise AI assistant specialized in analyzing and extracting information from resumes. Your responses must be factual, professional, and based EXCLUSIVELY on the provided resume content.
+
+//       User Question: "${question}"
+
+//       Relevant Resumes Provided:
+//       ${contextText}
+
+//       - CRITICAL: When referencing information from a resume, YOU MUST mention the resume's filename in parentheses, e.g., "(Guddu_Kumar_Pandit.pdf)". If you don't cite the filename, the UI will not show the document.
+//       - If multiple resumes contain relevant information, cite EACH one that contributed to your answer.
+//       - For questions about your process, tool calling, or how results were retrieved, respond: "I used the *generateEmbedding* and *queryPinecone* tools to perform a semantic search across the resume database and retrieve the most relevant matches."
+//       - Do NOT mention any other tools or internal processes.
+//       - Use clear Markdown formatting: *Bold* for emphasis, bullet points for lists, and Citations in (parentheses).
+//       - Keep responses concise and directly relevant to the question.
+//       `;
+
+//     // 5. Generate Answer with Gemini using History Context
+//     const chatContents = history || [];
+
+//     chatContents.push({
+//       role: "user",
+//       parts: [{ text: systemInstruction }]
+//     });
+
+//     const result = await ai.models.generateContent({
+//       model: GENERATION_MODEL,
+//       contents: chatContents
+//     });
+
+//     const answer = result.text;
+
+//     // --- CITE-CHECK FILTERING (ROBUST) ---
+//     // Only show resume buttons for files the AI actually mentioned.
+//     let filteredMatches = matchesDetail;
+//     if (matchesDetail.length > 0 && answer) {
+//       filteredMatches = matchesDetail.filter(m => {
+//         const fullMatch = answer.toLowerCase().includes(m.fileName.toLowerCase());
+//         const baseName = m.fileName.split('.').slice(0, -1).join('.');
+//         const nameMatch = baseName && answer.toLowerCase().includes(baseName.toLowerCase());
+//         return fullMatch || nameMatch;
+//       });
+//     }
+//     // -------------------------------------
+
+//     res.json({
+//       answer,
+//       matches: filteredMatches,
+//       systemPrompt: systemInstruction,
+//       toolCalls
+//     });
+
+//   } catch (err) {
+//     console.error("Ask resume error:", err);
+//     res.status(500).json({ message: "Failed to process your request" });
+//   }
+// });
+
+
+
 /* =========================
    ASK ABOUT RESUMES (REGEX KEYWORD + GEMINI)
 ========================= */
@@ -264,6 +493,38 @@ router.post("/ask", protect, async (req, res) => {
     }
 
     const toolCalls = [];
+
+    /* =========================
+       INTENT DETECTION (NEW)
+    ========================= */
+    const resumeIntent = isResumeQuestion(question);
+
+    /* =========================
+       NON-RESUME QUESTIONS (NEW PATH)
+       → NO EMBEDDING
+       → NO PINECONE
+    ========================= */
+    if (!resumeIntent) {
+      const result = await ai.models.generateContent({
+        model: GENERATION_MODEL,
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: question }]
+          }
+        ]
+      });
+
+      return res.json({
+        answer: result.text,
+        matches: [],
+        toolCalls
+      });
+    }
+
+    // =========================
+    // BELOW THIS POINT → RESUME QUESTIONS ONLY
+    // =========================
 
     // 1. Fetch user's resumes (or specific one)
     const query = { userId: req.user.id };
@@ -390,32 +651,21 @@ router.post("/ask", protect, async (req, res) => {
       Relevant Resumes Provided:
       ${contextText}
 
-      INSTRUCTIONS:
-      - Answer the user's question USING ONLY information explicitly stated in the provided resumes. Do NOT add, assume, or infer any details not directly present.
-      - If the question cannot be fully answered with the provided resumes, state clearly what is available and note what is missing. If no relevant information exists, respond: "I cannot find that information in the provided resumes."
-      - If multiple resumes contain relevant information, compare or combine them as needed, citing each accordingly.
-      - For questions about your process,tool calling, tool usage, or how results were retrieved (e.g., "how did you find this", "tool calls"), respond: "I used the **generateEmbedding** and **queryPinecone** tools to perform a semantic search across the resume database and retrieve the most relevant matches."
-      - Do NOT mention any other tools, internal processes, or external knowledge unless explicitly asked about the above.
-      - Use clear Markdown formatting for readability:
-        - Headings (#, ##) for sections
-        - Bullet points or numbered lists for multiple items
-        - **Bold** for emphasis (e.g., job titles, skills)
-        - Tables if comparing multiple candidates
-        - Blockquotes for direct quotes from resumes if helpful
-      - Keep responses concise, objective, and directly relevant to the question.
+      - CRITICAL: When referencing information from a resume, YOU MUST mention the resume's filename in parentheses.
+      - If multiple resumes contain relevant information, cite EACH one.
+      - For questions about your process, tool calling, or how results were retrieved, respond: "I used the **generateEmbedding** and **queryPinecone** tools to perform a semantic search across the resume database and retrieve the most relevant matches."
+      - Do NOT mention any other tools or internal processes.
+      - Use clear Markdown formatting.
+      - Keep responses concise and directly relevant.
       `;
 
     // 5. Generate Answer with Gemini using History Context
-    // Format history if it exists
     const chatContents = history || [];
 
-    // Add the current prompt as the last user message
     chatContents.push({
       role: "user",
       parts: [{ text: systemInstruction }]
     });
-
-    console.log("DEBUG: Full Prompt Contents sent to Gemini:", JSON.stringify(chatContents, null, 2));
 
     const result = await ai.models.generateContent({
       model: GENERATION_MODEL,
@@ -424,23 +674,23 @@ router.post("/ask", protect, async (req, res) => {
 
     const answer = result.text;
 
-    // --- CITE-CHECK FILTERING (NEW) ---
-    // Only show resume buttons for files the AI actually mentioned in its response.
-    // This prevents "semantic noise" from Pinecone showing up in the UI.
+    // --- CITE-CHECK FILTERING (ROBUST) ---
     let filteredMatches = matchesDetail;
     if (matchesDetail.length > 0 && answer) {
-      filteredMatches = matchesDetail.filter(m =>
-        answer.includes(m.fileName) ||
-        answer.toLowerCase().includes(m.fileName.toLowerCase())
-      );
+      filteredMatches = matchesDetail.filter(m => {
+        const fullMatch = answer.toLowerCase().includes(m.fileName.toLowerCase());
+        const baseName = m.fileName.split('.').slice(0, -1).join('.');
+        const nameMatch = baseName && answer.toLowerCase().includes(baseName.toLowerCase());
+        return fullMatch || nameMatch;
+      });
     }
-    // ----------------------------------
+    // -------------------------------------
 
     res.json({
       answer,
       matches: filteredMatches,
-      systemPrompt: systemInstruction, // Send this back so frontend can store/log it
-      toolCalls // Provide clinical details of internal steps
+      systemPrompt: systemInstruction,
+      toolCalls
     });
 
   } catch (err) {
