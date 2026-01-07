@@ -361,19 +361,29 @@ router.post("/ask", protect, async (req, res) => {
       )
       .join("\n\n");
 
-    const systemInstruction = `
-      You are an AI assistant analyzing resumes.
+      const systemInstruction = `
+      You are a precise AI assistant specialized in analyzing and extracting information from resumes. Your responses must be factual, professional, and based EXCLUSIVELY on the provided resume content.
+
       User Question: "${question}"
 
-      Here are the most relevant resumes found:
+      Relevant Resumes Provided:
       ${contextText}
 
-      Based ONLY on the provided resumes, answer the user's question.
-      - If the user asks about "tool calls", "process", or "how you found this", explain that you used the "generateEmbedding" and "queryPinecone" tools. Example: "The tool calls used were generateEmbedding and queryPinecone."
-      - If the answer is not in the resumes and doesn't relate to your process, say "I cannot find that information in the provided resumes."
-      - Cite the filename when mentioning specific details.
-      - Use Markdown formatting for your responses.
-    `;
+      INSTRUCTIONS:
+      - Answer the user's question USING ONLY information explicitly stated in the provided resumes. Do NOT add, assume, or infer any details not directly present.
+      - If the question cannot be fully answered with the provided resumes, state clearly what is available and note what is missing. If no relevant information exists, respond: "I cannot find that information in the provided resumes."
+      - When referencing specific details (e.g., experience, skills, education, dates), ALWAYS cite the source by including the filename in parentheses.
+      - If multiple resumes contain relevant information, compare or combine them as needed, citing each accordingly.
+      - For questions about your process, tool usage, or how results were retrieved (e.g., "how did you find this", "tool calls"), respond: "I used the **generateEmbedding** and **queryPinecone** tools to perform a semantic search across the resume database and retrieve the most relevant matches."
+      - Do NOT mention any other tools, internal processes, or external knowledge unless explicitly asked about the above.
+      - Use clear Markdown formatting for readability:
+        - Headings (#, ##) for sections
+        - Bullet points or numbered lists for multiple items
+        - **Bold** for emphasis (e.g., job titles, skills)
+        - Tables if comparing multiple candidates
+        - Blockquotes for direct quotes from resumes if helpful
+      - Keep responses concise, objective, and directly relevant to the question.
+      `;  
 
     // 5. Generate Answer with Gemini using History Context
     // Format history if it exists
@@ -513,40 +523,59 @@ router.post("/analyze-single", protect, async (req, res) => {
       return res.status(400).json({ message: "Resume text is required" });
     }
 
-    const prompt = `
-You are an expert resume reviewer and career coach. Analyze the following resume and provide a comprehensive assessment.
+const prompt = `
+You are an expert resume reviewer and senior career coach with deep knowledge of modern hiring practices, Applicant Tracking Systems (ATS), and industry standards across tech, finance, marketing, and other professional fields.
 
-Resume:
+Your task is to carefully analyze the provided resume and deliver a structured, objective, and actionable assessment.
+
+Resume Content:
 ${resumeText}
 
-Provide your analysis in the following JSON format ONLY (no markdown, no code blocks, just pure JSON):
+Respond EXCLUSIVELY in valid JSON format. Do not include any markdown, explanations, code blocks, or additional text outside the JSON object.
+
+The JSON must have the following structure and fields:
+
 {
-  "score": <number between 0-100>,
-  "summary": "<2-3 sentence overall summary>",
+  "score": <integer from 0 to 100 representing overall resume effectiveness>,
+  "summary": "<A concise 2-3 sentence overview of the resume's strengths, weaknesses, and overall impression>",
   "strengths": [
-    "<strength 1>",
-    "<strength 2>",
-    "<strength 3>"
+    "<Clear, specific strength 1>",
+    "<Clear, specific strength 2>",
+    "<Clear, specific strength 3>",
+    "<Additional strengths as needed>"
   ],
   "improvements": [
-    "<improvement suggestion 1>",
-    "<improvement suggestion 2>",
-    "<improvement suggestion 3>"
+    "<Specific, actionable improvement suggestion 1>",
+    "<Specific, actionable improvement suggestion 2>",
+    "<Specific, actionable improvement suggestion 3>",
+    "<Additional suggestions as needed>"
   ],
   "missing": [
-    "<missing section or element 1>",
-    "<missing section or element 2>"
+    "<Important element or section that is entirely absent 1>",
+    "<Important element or section that is entirely absent 2>",
+    "<Additional missing items as needed (use empty array if nothing critical is missing)>"
+  ],
+  "ats_friendly": <true if the resume is highly ATS-compatible, false if it has clear ATS risks (e.g., tables, columns, images, non-standard fonts)>,
+  "red_flags": [
+    "<Any major concerns such as employment gaps, frequent job changes, typos, or inconsistent formatting>",
+    "<Additional red flags or empty array if none>"
   ]
 }
 
-Focus on:
-- Contact information completeness
-- Work experience clarity and impact
-- Skills section presence and relevance
-- Education details
-- Formatting and readability
-- Quantifiable achievements
-- Keywords for ATS systems
+Evaluation Criteria (apply these rigorously):
+- Completeness and accuracy of contact information (name, phone, email, LinkedIn, location)
+- Professional summary or objective (if present and effective)
+- Work experience: clarity, relevance, use of strong action verbs, quantifiable achievements (numbers, metrics, impact)
+- Skills section: presence, relevance to target roles, inclusion of both technical and soft skills
+- Education: degrees, institutions, graduation years, relevant coursework or honors
+- Additional sections: certifications, projects, publications, volunteer work (as appropriate)
+- Formatting: readability, consistency, length (ideally 1-2 pages), use of bullet points, white space
+- ATS compatibility: plain text-friendly, standard section headings, no tables/graphics/columns, keyword optimization for target roles
+- Grammar, spelling, punctuation, and overall professionalism
+
+Prioritize quantifiable achievements and impact-oriented language. Be candid but constructive in feedback.
+
+Ensure the JSON is valid and can be parsed directly.
 `;
 
     const result = await ai.models.generateContent({
