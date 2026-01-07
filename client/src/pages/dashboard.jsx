@@ -1,27 +1,46 @@
 import { useEffect, useState, useRef, useContext } from "react";
 import { askResume, getMyResumes, getResumeContent, uploadResume } from "../api/authapi";
-import { SendHorizontal, Eye, X, Loader2, Plus, Copy, FileText, User } from "lucide-react";
+import { SendHorizontal, Eye, X, Loader2, Plus, Copy, FileText, User, Trash2 } from "lucide-react";
 import { useToast } from "../context/ToastContext";
 import { AuthContext } from "../context/authcontext";
+import { useChat } from "../context/ChatContext";
+import ReactMarkdown from "react-markdown";
 
 // Typing effect component
 const TypewriterMessage = ({ text, onComplete }) => {
   const [displayedText, setDisplayedText] = useState("");
   const [index, setIndex] = useState(0);
+  const hasCompleted = useRef(false);
+
+  // Reset state if text changes
+  useEffect(() => {
+    setDisplayedText("");
+    setIndex(0);
+    hasCompleted.current = false;
+  }, [text]);
 
   useEffect(() => {
+    if (!text) return;
+
     if (index < text.length) {
       const timeout = setTimeout(() => {
         setDisplayedText((prev) => prev + text[index]);
         setIndex((prev) => prev + 1);
       }, 5); // Faster typing speed
       return () => clearTimeout(timeout);
-    } else if (onComplete) {
+    } else if (onComplete && !hasCompleted.current) {
+      hasCompleted.current = true;
       onComplete();
     }
   }, [index, text, onComplete]);
 
-  return <p className="whitespace-pre-wrap">{displayedText}</p>;
+  return (
+    <div className="prose prose-slate max-w-none">
+      <div className="whitespace-pre-wrap">
+        <ReactMarkdown>{displayedText}</ReactMarkdown>
+      </div>
+    </div>
+  );
 };
 
 const replies = {
@@ -62,13 +81,13 @@ const replies = {
     "Okay 👍\nI’m here when you need me.",
     "No worries 😊\nJust tell me when you’re ready.",
   ],
-  hmm:[
-     "Alright 🙂\nLet me know if you need anything.",
+  hmm: [
+    "Alright 🙂\nLet me know if you need anything.",
     "Okay 👍\nI’m here when you need me.",
     "No worries 😊\nJust tell me when you’re ready.",
   ],
-  okay:[
-     "Alright 🙂\nLet me know if you need anything.",
+  okay: [
+    "Alright 🙂\nLet me know if you need anything.",
     "Okay 👍\nI’m here when you need me.",
     "No worries 😊\nJust tell me when you’re ready.",
   ],
@@ -87,7 +106,7 @@ const replies = {
 const Dashboard = () => {
   const { user } = useContext(AuthContext);
   const { addToast } = useToast();
-  const [messages, setMessages] = useState([]);
+  const { messages, setMessages, currentResumeId, setCurrentResumeId, clearHistory } = useChat();
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -96,13 +115,27 @@ const Dashboard = () => {
   const [previewMeta, setPreviewMeta] = useState({ id: null, fileName: "" });
   const [attachedFile, setAttachedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [currentResumeId, setCurrentResumeId] = useState(null);
+  const [userResumes, setUserResumes] = useState([]);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const isChatting = messages.length > 0;
+
+  // Fetch user resumes for context mapping if needed
+  useEffect(() => {
+    fetchResumes();
+  }, []);
+
+  const fetchResumes = async () => {
+    try {
+      const res = await getMyResumes();
+      setUserResumes(res.data.resumes || []);
+    } catch (err) {
+      console.error("Error fetching resumes:", err);
+    }
+  };
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -228,11 +261,18 @@ const Dashboard = () => {
       const questionToAsk = userMessage || (fileToUpload ? `Provide a brief analysis and key highlights of this resume.` : "");
 
       if (questionToAsk) {
+        // Send history for context if possible
+        const chatHistory = messages.map(m => ({
+          role: m.type === "user" ? "user" : "model",
+          parts: [{ text: m.content }]
+        }));
+
         const res = await askResume({
           question: questionToAsk,
-          resumeId: activeResumeId // Pass context if we have one
+          resumeId: activeResumeId,
+          history: chatHistory
         });
-        const answer = res.data.answer;
+        const answer = res.data.answer || "I'm sorry, I couldn't generate a response.";
         const matches = res.data.matches || [];
 
         setMessages(prev => [...prev, {
@@ -306,7 +346,11 @@ const Dashboard = () => {
                       {msg.isTyping ? (
                         <TypewriterMessage text={msg.content} onComplete={() => handleTypingComplete(idx)} />
                       ) : (
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <div className="prose prose-slate max-w-none">
+                          <div className="whitespace-pre-wrap">
+                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                          </div>
+                        </div>
                       )}
                     </div>
 
@@ -373,10 +417,12 @@ const Dashboard = () => {
 
         {/* Hero State Empty State */}
         {!isChatting && (
-          <div className="flex flex-col items-center justify-center mb-18 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            <p className="text-slate-600 text-lg md:text-xl font-normal text-center leading-relaxed">
-              Upload your resume <br />
-              <span className="text-slate-600 font-normal">Once uploaded, you can ask for feedback, improvements, or tailored advice.</span>
+          <div className="flex flex-col items-center justify-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+            <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4 text-center">
+              Welcome back, {user?.name?.split(' ')[0] || 'there'}!
+            </h1>
+            <p className="text-slate-600 text-lg md:text-xl font-normal text-center leading-relaxed max-w-lg">
+              Upload your resume or ask questions to find the best candidates.
             </p>
           </div>
         )}
@@ -431,6 +477,16 @@ const Dashboard = () => {
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <SendHorizontal className="w-5 h-5" />}
               </button>
             </div>
+          </div>
+
+          <div className="flex justify-center mt-4 gap-4">
+            <button
+              onClick={clearHistory}
+              className="text-xs text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1"
+            >
+              <Trash2 className="w-3 h-3" />
+              Clear Conversation History
+            </button>
           </div>
 
           <p className={`text-center font-light text-slate-400 mt-6 transition-opacity duration-500 ${isChatting ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>

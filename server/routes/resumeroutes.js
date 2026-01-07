@@ -242,7 +242,7 @@ router.get('/resumes/:resumeId/content', protect, async (req, res) => {
 ========================= */
 router.post("/ask", protect, async (req, res) => {
   try {
-    const { question, resumeId } = req.body;
+    const { question, resumeId, history } = req.body;
 
     if (!question || !question.trim()) {
       return res.status(400).json({ message: "Question is required" });
@@ -251,10 +251,9 @@ router.post("/ask", protect, async (req, res) => {
     // 1. Fetch user's resumes (or specific one)
     const query = { userId: req.user.id };
     if (resumeId) {
-      if (!mongoose.Types.ObjectId.isValid(resumeId)) {
-        return res.status(400).json({ message: "Invalid resume ID" });
+      if (mongoose.Types.ObjectId.isValid(resumeId)) {
+        query._id = resumeId;
       }
-      query._id = resumeId;
     }
     const resumes = await Resume.find(query);
 
@@ -271,10 +270,16 @@ router.post("/ask", protect, async (req, res) => {
     if (questionEmbedding) {
       // 3. Query Pinecone
       try {
+        const queryFilter = { userId: { $eq: req.user.id } };
+        // If searching a specific resume, restrict Pinecone query too
+        if (resumeId) {
+          queryFilter._id = { $eq: resumeId };
+        }
+
         const queryResponse = await pineconeIndex.query({
           vector: questionEmbedding,
           topK: 5,
-          filter: { userId: { $eq: req.user.id } },
+          filter: queryFilter,
           includeMetadata: true,
         });
 
@@ -301,13 +306,11 @@ router.post("/ask", protect, async (req, res) => {
           matchesDetail = topResumes.map(m => ({
             _id: m._id,
             fileName: m.fileName,
-            score: (m.score * 100).toFixed(2) + "%" // Convert to readable percentage
+            score: (m.score * 100).toFixed(2) + "%"
           }));
         }
       } catch (pcError) {
         console.error("Pinecone query error:", pcError);
-        // Fallback to keyword search if Pinecone fails? 
-        // For now, let's just proceed with empty topResumes or handle specifically
       }
     }
 
@@ -319,38 +322,41 @@ router.post("/ask", protect, async (req, res) => {
     }
 
     // 4. Construct Prompt
-    const context = topResumes
+    const contextText = topResumes
       .map(
         (r, i) =>
           `Resume ${i + 1} (${r.fileName}):\n${(r.text || "").slice(0, 3000)}...`
       )
       .join("\n\n");
 
-    const prompt = `
+    const systemInstruction = `
       You are an AI assistant analyzing resumes.
       User Question: "${question}"
 
-      Here are the most relevant resumes found (based on keyword match):
-      ${context}
+      Here are the most relevant resumes found:
+      ${contextText}
 
       Based ONLY on the provided resumes, answer the user's question.
       If the answer is not in the resumes, say "I cannot find that information in the provided resumes."
       Cite the filename when mentioning specific details.
+      Use Markdown formatting for your responses.
     `;
 
-    // 5. Generate Answer with Gemini
-    const result = await ai.models.generateContent({
-      model: GENERATION_MODEL,
-      contents: prompt
+    // 5. Generate Answer with Gemini using History Context
+    // Format history if it exists
+    const chatContents = history || [];
+
+    // Add the current prompt as the last user message
+    chatContents.push({
+      role: "user",
+      parts: [{ text: systemInstruction }]
     });
 
-    // Check if result.response exists or if result itself is the response
-    // Per new SDK docs:
-    // const response = await ai.models.generateContent(...);
-    // console.log(response.text);
-    // So result IS the response object directly usually, or contains .text() if helper is used?
-    // User snippet: console.log(response.text);
-    // So:
+    const result = await ai.models.generateContent({
+      model: GENERATION_MODEL,
+      contents: chatContents
+    });
+
     const answer = result.text;
 
     res.json({
