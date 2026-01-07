@@ -23,8 +23,8 @@ const Navbar = () => {
       fetchResumeCount();
       const interval = setInterval(fetchResumeCount, 1000);
 
-    // cleanup (VERY IMPORTANT)
-    return () => clearInterval(interval);
+      // cleanup (VERY IMPORTANT)
+      return () => clearInterval(interval);
 
     }
   }, [isAuth]);

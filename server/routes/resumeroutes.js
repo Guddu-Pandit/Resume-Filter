@@ -15,7 +15,7 @@ import { pineconeIndex } from "../config/pinecone.js";
 // Initialize Gemini model (lazily or using shared client)
 // Switching to gemini-2.0-flash-exp as gemini-2.0-flash hit a 0 quota limit
 // In new SDK, we just define the model name string here for usage later.
-const GENERATION_MODEL = "gemini-2.0-flash-exp";
+const GENERATION_MODEL = "gemini-2.5-flash";
 
 async function generateEmbedding(text) {
   try {

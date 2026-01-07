@@ -24,6 +24,66 @@ const TypewriterMessage = ({ text, onComplete }) => {
   return <p className="whitespace-pre-wrap">{displayedText}</p>;
 };
 
+const replies = {
+  hello: [
+    "Hello 👋\nHow can I help you today?",
+    "Hi there 😊\nWhat would you like to do?",
+    "Hey! 👋\nI’m here to help.",
+  ],
+  hi: [
+    "Hello 👋\nHow can I help you today?",
+    "Hi there 😊\nWhat would you like to do?",
+    "Hey! 👋\nI’m here to help.",
+  ],
+  hii: [
+    "Hello 👋\nHow can I help you today?",
+    "Hi there 😊\nWhat would you like to do?",
+    "Hey! 👋\nI’m here to help.",
+  ],
+  morning: [
+    "Good morning 🌅\nHope you have a productive day!",
+    "Good morning ☀️\nHow can I assist you today?",
+    "Morning 😊\nReady to get started?",
+  ],
+  afternoon: [
+    "Good afternoon 🌤️\nHope your day is going well!",
+    "Good afternoon 😊\nHow can I help?",
+  ],
+  evening: [
+    "Good evening 🌆\nHow was your day?",
+    "Good evening 😊\nWhat can I do for you?",
+  ],
+  night: [
+    "Good night 🌙\nSleep well!",
+    "Good night 😴\nTake care and see you soon!",
+  ],
+  ok: [
+    "Alright 🙂\nLet me know if you need anything.",
+    "Okay 👍\nI’m here when you need me.",
+    "No worries 😊\nJust tell me when you’re ready.",
+  ],
+  hmm:[
+     "Alright 🙂\nLet me know if you need anything.",
+    "Okay 👍\nI’m here when you need me.",
+    "No worries 😊\nJust tell me when you’re ready.",
+  ],
+  okay:[
+     "Alright 🙂\nLet me know if you need anything.",
+    "Okay 👍\nI’m here when you need me.",
+    "No worries 😊\nJust tell me when you’re ready.",
+  ],
+  thanks: [
+    "You’re welcome 😊\nHappy to help!",
+    "No problem at all 👍",
+    "Anytime! 😄",
+  ],
+  bye: [
+    "Goodbye 👋\nHave a great day!",
+    "Bye 😊\nTake care!",
+    "See you soon 👋",
+  ],
+};
+
 const Dashboard = () => {
   const { user } = useContext(AuthContext);
   const { addToast } = useToast();
@@ -96,10 +156,16 @@ const Dashboard = () => {
     addToast("Copied to clipboard", "success");
   };
 
-  // Check if message is a greeting
-  const isGreeting = (text) => {
-    const greetings = ["hi", "hello", "hey", "hii", "hiii", "hola", "good morning", "good afternoon", "good evening"];
-    return greetings.some(g => text.toLowerCase().trim() === g || text.toLowerCase().trim().startsWith(g + " "));
+  // Check if message is a greeting and return a random reply
+  const getRandomReply = (text) => {
+    const lowerText = text.toLowerCase().trim();
+    for (const key in replies) {
+      if (lowerText.includes(key)) {
+        const options = replies[key];
+        return options[Math.floor(Math.random() * options.length)];
+      }
+    }
+    return null;
   };
 
   // Handle send message
@@ -121,11 +187,12 @@ const Dashboard = () => {
     setMessages(prev => [...prev, { type: "user", content: userMsgContent }]);
 
     // Check for greeting (only if no file attached)
-    if (!fileToUpload && isGreeting(userMessage)) {
-      const userName = user?.name || "there";
-      const greetingResponse = `Hello 👋\nHow can I help you today with resumes?`;
-      setMessages(prev => [...prev, { type: "assistant", content: greetingResponse, isTyping: true }]);
-      return;
+    if (!fileToUpload) {
+      const greetingReply = getRandomReply(userMessage);
+      if (greetingReply) {
+        setMessages(prev => [...prev, { type: "assistant", content: greetingReply, isTyping: true }]);
+        return;
+      }
     }
 
     setLoading(true);
