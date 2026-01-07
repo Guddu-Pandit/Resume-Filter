@@ -30,6 +30,21 @@ async function generateEmbedding(text) {
   }
 }
 
+// Helper to clean extracted text
+const cleanText = (text) => {
+  if (!text) return "";
+  let cleaned = text
+    .replace(/\r/g, "")
+    .replace(/^[ \t]+/gm, "")
+    .replace(/\n\s*\n\s*\n+/g, "\n\n");
+
+  // Ensure double newline before lines that look like section titles (e.g. "Skills:", "Work Experience:")
+  // This helps separate sections even if the PDF text was cramped.
+  cleaned = cleaned.replace(/\n([A-Z][^:\n]{2,50}:)/g, "\n\n$1");
+
+  return cleaned.trim();
+};
+
 const router = express.Router();
 
 /* =========================
@@ -54,12 +69,12 @@ router.post(
 
       if (file.mimetype === "application/pdf") {
         const data = await pdfParse(file.buffer);
-        text = data.text || "";
+        text = cleanText(data.text || "");
       } else {
         const result = await mammoth.extractRawText({
           buffer: file.buffer,
         });
-        text = result.value || "";
+        text = cleanText(result.value || "");
       }
 
       // 🔥 allow multiple resumes per user
@@ -119,7 +134,7 @@ router.post(
 
       if (file.mimetype === "application/pdf") {
         const data = await pdfParse(file.buffer);
-        text = data.text || "";
+        text = cleanText(data.text || "");
       } else if (
         file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
         file.originalname.endsWith(".docx")
@@ -127,9 +142,9 @@ router.post(
         const result = await mammoth.extractRawText({
           buffer: file.buffer,
         });
-        text = result.value || "";
+        text = cleanText(result.value || "");
       } else if (file.mimetype === "text/plain" || file.originalname.endsWith(".txt")) {
-        text = file.buffer.toString("utf-8");
+        text = cleanText(file.buffer.toString("utf-8"));
       } else {
         return res.status(400).json({ message: "Unsupported file type" });
       }
@@ -248,6 +263,8 @@ router.post("/ask", protect, async (req, res) => {
       return res.status(400).json({ message: "Question is required" });
     }
 
+    const toolCalls = [];
+
     // 1. Fetch user's resumes (or specific one)
     const query = { userId: req.user.id };
     if (resumeId) {
@@ -263,6 +280,12 @@ router.post("/ask", protect, async (req, res) => {
 
     // 2. Generate Embedding for Question
     const questionEmbedding = await generateEmbedding(question);
+    toolCalls.push({
+      tool: "generateEmbedding",
+      input: question.slice(0, 50) + (question.length > 50 ? "..." : ""),
+      status: questionEmbedding ? "success" : "failed",
+      details: "Generated 768-dimension vector for query"
+    });
 
     let topResumes = [];
     let matchesDetail = [];
@@ -281,6 +304,13 @@ router.post("/ask", protect, async (req, res) => {
           topK: 5,
           filter: queryFilter,
           includeMetadata: true,
+        });
+
+        toolCalls.push({
+          tool: "queryPinecone",
+          filters: queryFilter,
+          matchCount: queryResponse.matches?.length || 0,
+          status: "success"
         });
 
         if (queryResponse.matches && queryResponse.matches.length > 0) {
@@ -311,13 +341,15 @@ router.post("/ask", protect, async (req, res) => {
         }
       } catch (pcError) {
         console.error("Pinecone query error:", pcError);
+        toolCalls.push({ tool: "queryPinecone", status: "error", error: pcError.message });
       }
     }
 
     if (topResumes.length === 0) {
       return res.json({
         answer: `I couldn't find any resumes matching your question.`,
-        matches: []
+        matches: [],
+        toolCalls
       });
     }
 
@@ -337,9 +369,10 @@ router.post("/ask", protect, async (req, res) => {
       ${contextText}
 
       Based ONLY on the provided resumes, answer the user's question.
-      If the answer is not in the resumes, say "I cannot find that information in the provided resumes."
-      Cite the filename when mentioning specific details.
-      Use Markdown formatting for your responses.
+      - If the user asks about "tool calls", "process", or "how you found this", explain that you used the "generateEmbedding" and "queryPinecone" tools. Example: "The tool calls used were generateEmbedding and queryPinecone."
+      - If the answer is not in the resumes and doesn't relate to your process, say "I cannot find that information in the provided resumes."
+      - Cite the filename when mentioning specific details.
+      - Use Markdown formatting for your responses.
     `;
 
     // 5. Generate Answer with Gemini using History Context
@@ -352,6 +385,8 @@ router.post("/ask", protect, async (req, res) => {
       parts: [{ text: systemInstruction }]
     });
 
+    console.log("DEBUG: Full Prompt Contents sent to Gemini:", JSON.stringify(chatContents, null, 2));
+
     const result = await ai.models.generateContent({
       model: GENERATION_MODEL,
       contents: chatContents
@@ -361,7 +396,9 @@ router.post("/ask", protect, async (req, res) => {
 
     res.json({
       answer,
-      matches: matchesDetail
+      matches: matchesDetail,
+      systemPrompt: systemInstruction, // Send this back so frontend can store/log it
+      toolCalls // Provide clinical details of internal steps
     });
 
   } catch (err) {

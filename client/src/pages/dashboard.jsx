@@ -35,10 +35,8 @@ const TypewriterMessage = ({ text, onComplete }) => {
   }, [index, text, onComplete]);
 
   return (
-    <div className="prose prose-slate max-w-none">
-      <div className="whitespace-pre-wrap">
-        <ReactMarkdown>{displayedText}</ReactMarkdown>
-      </div>
+    <div className="prose prose-slate prose-sm max-w-none prose-p:mb-0 prose-p:mt-3 prose-headings:mt-6 prose-headings:mb-2 prose-ul:my-2 prose-li:my-0.5 leading-tight">
+      <ReactMarkdown>{displayedText}</ReactMarkdown>
     </div>
   );
 };
@@ -192,8 +190,15 @@ const Dashboard = () => {
   // Check if message is a greeting and return a random reply
   const getRandomReply = (text) => {
     const lowerText = text.toLowerCase().trim();
+    // Match only if the entire input is a greeting or starts with a greeting followed by a space
+    // to prevent matching "hi" inside "which" or "higher"
+    const words = lowerText.replace(/[?.,!]/g, "").split(/\s+/);
+
+    // Common greetings should be the only word or the first word in a very short sentence
+    if (words.length > 3) return null;
+
     for (const key in replies) {
-      if (lowerText.includes(key)) {
+      if (words.includes(key)) {
         const options = replies[key];
         return options[Math.floor(Math.random() * options.length)];
       }
@@ -267,6 +272,8 @@ const Dashboard = () => {
           parts: [{ text: m.content }]
         }));
 
+        console.log("DEBUG: Sending Chat History to LLM:", chatHistory);
+
         const res = await askResume({
           question: questionToAsk,
           resumeId: activeResumeId,
@@ -274,11 +281,15 @@ const Dashboard = () => {
         });
         const answer = res.data.answer || "I'm sorry, I couldn't generate a response.";
         const matches = res.data.matches || [];
+        const systemPrompt = res.data.systemPrompt;
+        const toolCalls = res.data.toolCalls || [];
 
         setMessages(prev => [...prev, {
           type: "assistant",
           content: answer,
           matches: matches,
+          systemPrompt: systemPrompt,
+          toolCalls: toolCalls,
           isTyping: true
         }]);
       } else {
@@ -346,10 +357,8 @@ const Dashboard = () => {
                       {msg.isTyping ? (
                         <TypewriterMessage text={msg.content} onComplete={() => handleTypingComplete(idx)} />
                       ) : (
-                        <div className="prose prose-slate max-w-none">
-                          <div className="whitespace-pre-wrap">
-                            <ReactMarkdown>{msg.content}</ReactMarkdown>
-                          </div>
+                        <div className="prose prose-slate prose-sm max-w-none prose-p:mb-0 prose-p:mt-3 prose-headings:mt-6 prose-headings:mb-2 prose-ul:my-2 prose-li:my-0.5 leading-tight">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
                       )}
                     </div>
@@ -371,9 +380,32 @@ const Dashboard = () => {
                       </div>
                     )}
 
+                    {/* Tool Calls Section */}
+                    {/* {msg.toolCalls && msg.toolCalls.length > 0 && !msg.isTyping && (
+                      <div className="mt-4 border-l-2 border-slate-100 pl-4 py-2 space-y-2">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Process Details</p>
+                        <div className="flex flex-wrap gap-2">
+                          {msg.toolCalls.map((tc, tIdx) => (
+                            <div key={tIdx} className="group relative">
+                              <span className={`px-2 py-1 rounded text-[10px] font-medium border ${tc.status === 'error' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}>
+                                {tc.tool} {tc.status === 'success' ? '✓' : '✗'}
+                              </span> */}
+                    {/* Hover tooltip with details */}
+                    {/* <div className="absolute bottom-full left-0 mb-2 invisible group-hover:visible bg-slate-800 text-white text-[10px] p-2 rounded shadow-xl whitespace-nowrap z-20">
+                                {tc.tool === 'generateEmbedding' && `Input: ${tc.input}`}
+                                {tc.tool === 'queryPinecone' && `Matches: ${tc.matchCount}`}
+                                {tc.details && <div className="mt-1 opacity-70">{tc.details}</div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )} */}
+
                     {/* Action Buttons */}
                     {!msg.isTyping && (
-                      <div className="flex items-center gap-1 text-slate-400 animate-in fade-in duration-500">
+                      <div className="flex items-center gap-2 text-slate-400 animate-in fade-in duration-500">
                         <button
                           onClick={() => handleCopy(msg.content)}
                           className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
@@ -381,6 +413,19 @@ const Dashboard = () => {
                         >
                           <Copy className="w-4 h-4" />
                         </button>
+
+                        {msg.systemPrompt && (
+                          <button
+                            onClick={() => {
+                              console.log("DEBUG: System Prompt for this turn:", msg.systemPrompt);
+                              addToast("System prompt logged to console", "info");
+                            }}
+                            className="text-[10px] px-2 py-0.5 border border-slate-200 rounded hover:bg-slate-50 transition-colors"
+                            title="Log System Prompt"
+                          >
+                            View Prompt
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -418,9 +463,6 @@ const Dashboard = () => {
         {/* Hero State Empty State */}
         {!isChatting && (
           <div className="flex flex-col items-center justify-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4 text-center">
-              Welcome back, {user?.name?.split(' ')[0] || 'there'}!
-            </h1>
             <p className="text-slate-600 text-lg md:text-xl font-normal text-center leading-relaxed max-w-lg">
               Upload your resume or ask questions to find the best candidates.
             </p>
@@ -481,6 +523,16 @@ const Dashboard = () => {
 
           <div className="flex justify-center mt-4 gap-4">
             <button
+              onClick={() => {
+                console.log("DEBUG: Current persistent messages array:", messages);
+                addToast("Current history logged to console", "info");
+              }}
+              className="text-xs text-slate-400 hover:text-[#00a86b] transition-colors flex items-center gap-1"
+            >
+              <FileText className="w-3 h-3" />
+              Log Raw History
+            </button>
+            <button
               onClick={clearHistory}
               className="text-xs text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1"
             >
@@ -526,7 +578,7 @@ const Dashboard = () => {
               ) : (
                 <div className="h-full overflow-y-auto p-4 md:p-10 custom-scrollbar">
                   <div className="bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] border border-slate-200 min-h-full p-8 md:p-16 max-w-4xl mx-auto rounded-2xl">
-                    <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 font-serif lowercase-first-line">
+                    <pre className="whitespace-pre-wrap text-sm leading-tight text-slate-700 font-serif lowercase-first-line">
                       {resumeContent || "No content available."}
                     </pre>
                   </div>
@@ -560,6 +612,23 @@ const Dashboard = () => {
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background-color: #94a3b8;
+        }
+
+        /* Spacing for bold headers and section titles */
+        .prose p strong:first-child {
+          margin-top: 1.25rem;
+          display: inline-block;
+        }
+        
+        /* Ensure specific spacing for lines that start with bold text (common in resumes) */
+        .prose p:has(> strong:first-child) {
+          margin-top: 1rem;
+        }
+
+        /* Tighten lines within lists but allow space between lists */
+        .prose ul, .prose ol {
+          margin-top: 0.5rem;
+          margin-bottom: 0.5rem;
         }
       `}</style>
     </div>
