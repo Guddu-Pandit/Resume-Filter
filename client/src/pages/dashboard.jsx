@@ -487,7 +487,7 @@ const Dashboard = () => {
               </div>
             )}
 
-            <div className={`flex items-center gap-2 px-5 py-3.5 bg-white border border-slate-200 rounded-[50px] focus-within:border-slate-300 focus-within:ring-0 focus-within:ring-slate-100 transition-all `}>
+            <div className={`flex items-center gap-2 px-5 py-2 bg-white border border-slate-200 rounded-[50px] focus-within:border-slate-300 focus-within:ring-0 focus-within:ring-slate-100 transition-all `}>
               {/* Plus button - Upload */}
               <button
                 onClick={() => fileInputRef.current?.click()}

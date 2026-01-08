@@ -25,17 +25,22 @@ const ResumeAnalyzer = () => {
         try {
             let text = "";
 
-            if (file.type === "application/pdf") {
-                text = "[PDF content will be extracted on analysis]";
-            } else if (
-                file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-                file.name.endsWith(".docx")
-            ) {
-                const arrayBuffer = await file.arrayBuffer();
-                const result = await mammoth.extractRawText({ arrayBuffer });
-                text = result.value || "";
-            } else if (file.name.endsWith(".doc")) {
-                text = "[DOC files require server-side processing]";
+            if (file.type === "application/pdf" || file.name.endsWith(".pdf") || file.name.endsWith(".doc") || file.name.endsWith(".docx")) {
+                // Use server-side extraction for PDF and Word files
+                const formData = new FormData();
+                formData.append("resume", file);
+
+                const token = localStorage.getItem("token");
+                const extractRes = await fetch("http://localhost:5000/api/resume/extract-text", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: formData,
+                });
+
+                const extractData = await extractRes.json();
+                text = extractData.text || "Failed to extract text from file.";
             } else {
                 text = await file.text();
             }
@@ -91,7 +96,7 @@ const ResumeAnalyzer = () => {
     };
 
     return (
-        <div className="min-h-screen bg-linear-to-b from-[#00a86b]/10 to-[#fefefe] pt-28 px-6 pb-12 font-['Inter',sans-serif]">
+        <div className="min-h-screen bg-linear-to-b from-[#00a86b]/10 to-[#fefefe] bg-fixed pt-28 px-6 pb-12 font-['Inter',sans-serif]">
             <div className="max-w-6xl mx-auto">
 
                 {/* Header */}
@@ -131,9 +136,9 @@ const ResumeAnalyzer = () => {
                     <div className={`grid gap-6 transition-all duration-300 ${showAnalysis ? 'md:grid-cols-2' : 'max-w-2xl mx-auto'}`}>
 
                         {/* Resume Display */}
-                        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col min-h-[500px]">
+                        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col h-[650px]">
                             {/* File Info Bar */}
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl mb-4">
+                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl mb-4 shrink-0">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <FileText className="w-5 h-5 text-[#00a86b] shrink-0" />
                                     <span className="font-medium text-slate-700 truncate">{selectedFile.name}</span>
@@ -164,7 +169,7 @@ const ResumeAnalyzer = () => {
                                 <button
                                     onClick={handleAnalyze}
                                     disabled={isAnalyzing || !resumeText || resumeText.startsWith("[")}
-                                    className="mt-4 w-full py-3.5 rounded-xl bg-[#00a86b] text-white font-semibold shadow-lg shadow-[#00a86b]/20 hover:bg-[#008f5a] hover:shadow-[#00a86b]/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
+                                    className="mt-4 w-full py-3.5 rounded-xl bg-[#00a86b] text-white font-semibold shadow-lg shadow-[#00a86b]/20 hover:bg-[#008f5a] hover:shadow-[#00a86b]/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 shrink-0"
                                 >
                                     <Sparkles className="w-5 h-5" />
                                     Analyze Resume
@@ -174,30 +179,30 @@ const ResumeAnalyzer = () => {
 
                         {/* Analysis Panel - Only show after clicking Analyze */}
                         {showAnalysis && (
-                            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col min-h-[500px] animate-in slide-in-from-right-5 duration-300">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col h-[650px] animate-in slide-in-from-right-5 duration-300 overflow-hidden">
+                                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 shrink-0">
                                     <Sparkles className="w-5 h-5 text-[#00a86b]" />
                                     AI Analysis
                                 </h3>
 
-                                {isAnalyzing ? (
-                                    // Loading State
-                                    <div className="flex-1 flex flex-col items-center justify-center text-center">
-                                        <Loader2 className="w-10 h-10 text-[#00a86b] animate-spin mb-4" />
-                                        <p className="font-medium text-slate-600">Analyzing your resume...</p>
-                                        <p className="text-sm text-slate-400 mt-1">This may take a few seconds</p>
-                                    </div>
-                                ) : analysisResult?.error ? (
-                                    // Error State
-                                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                                        <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                            <AlertCircle className="w-8 h-8" />
+                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                                    {isAnalyzing ? (
+                                        // Loading State
+                                        <div className="h-full flex flex-col items-center justify-center text-center">
+                                            <Loader2 className="w-10 h-10 text-[#00a86b] animate-spin mb-4" />
+                                            <p className="font-medium text-slate-600">Analyzing your resume...</p>
+                                            <p className="text-sm text-slate-400 mt-1">This may take a few seconds</p>
                                         </div>
-                                        <p className="font-medium text-red-600">{analysisResult.error}</p>
-                                    </div>
-                                ) : analysisResult ? (
-                                    // Analysis Results
-                                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                    ) : analysisResult?.error ? (
+                                        // Error State
+                                        <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                                            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                                <AlertCircle className="w-8 h-8" />
+                                            </div>
+                                            <p className="font-medium text-red-600">{analysisResult.error}</p>
+                                        </div>
+                                    ) : analysisResult ? (
+                                        // Analysis Results
                                         <div className="space-y-4">
                                             {/* Overall Score */}
                                             {analysisResult.score !== undefined && (
@@ -279,8 +284,8 @@ const ResumeAnalyzer = () => {
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
-                                ) : null}
+                                    ) : null}
+                                </div>
                             </div>
                         )}
                     </div>

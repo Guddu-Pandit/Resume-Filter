@@ -122,7 +122,7 @@ const UploadedResumes = () => {
     };
 
     return (
-        <div className="min-h-screen bg-linear-to-b from-[#00a86b]/10 to-[#fefefe] pt-28 px-6 pb-12 font-['Inter',sans-serif]">
+        <div className="min-h-screen bg-linear-to-b from-[#00a86b]/10 to-[#fefefe] bg-fixed pt-28 px-6 pb-12 font-['Inter',sans-serif]">
             <div className="max-w-6xl mx-auto">
 
                 {/* Header */}
