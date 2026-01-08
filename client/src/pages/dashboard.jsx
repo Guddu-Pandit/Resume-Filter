@@ -7,7 +7,7 @@ import { useChat } from "../context/ChatContext";
 import ReactMarkdown from "react-markdown";
 
 // Typing effect component
-const TypewriterMessage = ({ text, onComplete }) => {
+const TypewriterMessage = ({ text, onComplete, isResume }) => {
   const [displayedText, setDisplayedText] = useState("");
   const [index, setIndex] = useState(0);
   const hasCompleted = useRef(false);
@@ -35,7 +35,7 @@ const TypewriterMessage = ({ text, onComplete }) => {
   }, [index, text, onComplete]);
 
   return (
-    <div className="prose prose-slate prose-sm max-w-none prose-p:my-4 prose-headings:mb-2 prose-headings:mt-8 prose-ul:my-3 prose-li:my-1.5 leading-normal">
+    <div className={`prose prose-slate prose-sm max-w-none prose-p:my-4 prose-headings:mb-2 prose-headings:mt-8 prose-ul:my-3 prose-li:my-1.5 leading-normal ${isResume ? 'is-resume' : ''}`}>
       <ReactMarkdown>{displayedText}</ReactMarkdown>
     </div>
   );
@@ -290,7 +290,8 @@ const Dashboard = () => {
           matches: matches,
           systemPrompt: systemPrompt,
           toolCalls: toolCalls,
-          isTyping: true
+          isTyping: true,
+          isResume: true
         }]);
       } else {
         setMessages(prev => [...prev, {
@@ -355,9 +356,9 @@ const Dashboard = () => {
                   <div className="space-y-4">
                     <div className="text-slate-700 leading-relaxed max-w-[95%]">
                       {msg.isTyping ? (
-                        <TypewriterMessage text={msg.content} onComplete={() => handleTypingComplete(idx)} />
+                        <TypewriterMessage text={msg.content} isResume={msg.isResume} onComplete={() => handleTypingComplete(idx)} />
                       ) : (
-                        <div className="prose prose-slate prose-sm max-w-none prose-p:my-4 prose-headings:mb-2 prose-headings:mt-8 prose-ul:my-3 prose-li:my-1.5 leading-normal">
+                        <div className={`prose prose-slate prose-sm max-w-none prose-p:my-4 prose-headings:mb-2 prose-headings:mt-8 prose-ul:my-3 prose-li:my-1.5 leading-normal ${msg.isResume ? 'is-resume' : ''}`}>
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
                       )}
@@ -614,33 +615,33 @@ const Dashboard = () => {
           background-color: #94a3b8;
         }
 
-        /* Spacing for bold headers and section titles */
-        .prose p strong:first-child,
-        .prose li strong:first-child {
+        /* Spacing for bold headers and section titles - ONLY FOR RESUMES */
+        .is-resume.prose p strong:first-child,
+        .is-resume.prose li strong:first-child {
           margin-top: 1.5rem;
           margin-bottom: 0.5rem;
           display: block;
         }
         
-        /* Ensure specific spacing for lines that start with bold text */
-        .prose p:has(> strong:first-child) {
+        /* Ensure specific spacing for lines that start with bold text - ONLY FOR RESUMES */
+        .is-resume.prose p:has(> strong:first-child) {
           margin-top: 2rem;
           margin-bottom: 1rem;
         }
 
         .prose p {
-          margin-top: 1rem;
-          margin-bottom: 1rem;
+          margin-top: 0.5rem;
+          margin-bottom: 0.5rem;
         }
 
         /* Spacing for lists */
         .prose ul, .prose ol {
-          margin-top: 1.25rem;
-          margin-bottom: 1.25rem;
+          margin-top: 0.75rem;
+          margin-bottom: 0.75rem;
         }
         .prose li {
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
+          margin-top: 0.25rem;
+          margin-bottom: 0.25rem;
         }
       `}</style>
     </div>
