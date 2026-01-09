@@ -421,7 +421,7 @@ const Dashboard = () => {
                               console.log("DEBUG: System Prompt for this turn:", msg.systemPrompt);
                               addToast("System prompt logged to console", "info");
                             }}
-                            className="text-[10px] px-2 py-0.5 border border-slate-200 rounded hover:bg-slate-50 transition-colors"
+                            className="text-[10px] hidden px-2 py-0.5 border border-slate-200 rounded hover:bg-slate-50 transition-colors"
                             title="Log System Prompt"
                           >
                             View Prompt
@@ -523,7 +523,7 @@ const Dashboard = () => {
           </div>
 
           <div className="flex justify-center mt-4 gap-4">
-            <button
+            {/* <button
               onClick={() => {
                 console.log("DEBUG: Current persistent messages array:", messages);
                 addToast("Current history logged to console", "info");
@@ -532,7 +532,7 @@ const Dashboard = () => {
             >
               <FileText className="w-3 h-3" />
               Log Raw History
-            </button>
+            </button> */}
             <button
               onClick={clearHistory}
               className="text-xs text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1"
