@@ -327,7 +327,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className={`min-h-screen bg-linear-to-b from-[#00a86b]/10 to-[#fefefe] pt-20 font-['Inter',sans-serif] flex flex-col transition-all duration-500`}>
+    <div className={`min-h-screen bg-fixed bg-linear-to-b from-[#00a86b]/10 to-[#fefefe] pt-20 font-['Inter',sans-serif] flex flex-col transition-all duration-500`}>
 
       {/* Hidden file input */}
       <input

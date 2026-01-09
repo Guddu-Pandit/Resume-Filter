@@ -84,14 +84,14 @@ const Navbar = () => {
                   {showDropdown && (
                     <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-slate-100 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
                       {/* User Info */}
-                      <div className="px-4 py-3 border-b border-slate-100">
+                      {/* <div className="px-4 py-3 border-b border-slate-100">
                         <p className="font-semibold text-slate-800 truncate">
                           {user?.name || "User"}
                         </p>
                         <p className="text-sm text-slate-500 truncate">
                           {user?.email || "user@email.com"}
                         </p>
-                      </div>
+                      </div> */}
 
                       {/* Uploaded Resumes Link */}
                       <Link
@@ -120,33 +120,34 @@ const Navbar = () => {
                         <span className="font-medium">Resume Analyzer</span>
                       </Link>
 
-                      {/* Logout */}
-                      <button
+                      {/* Logout - Commented out */}
+                      {/* <button
                         onClick={handleLogout}
                         className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors border-t border-slate-100 mt-1"
                       >
                         <LogOut className="w-5 h-5" />
                         <span className="font-medium">Logout</span>
-                      </button>
+                      </button> */}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center space-x-6">
+                // Login/Signup links - Commented out
+                null
+                /* <div className="flex items-center space-x-6">
                   <Link
                     to="/login"
                     className="px-6 py-2.5 rounded-xl text-slate-600 hover:text-[#00a86b] hover:bg-[#00a86b]/5 transition font-semibold"
                   >
                     Login
                   </Link>
-
                   <Link
                     to="/signup"
                     className="px-6 py-2.5 rounded-xl bg-[#00a86b] text-white hover:bg-[#008f5a] transition shadow-lg shadow-[#00a86b]/20 font-semibold"
                   >
                     Get Started
                   </Link>
-                </div>
+                </div> */
               )}
             </div>
 
