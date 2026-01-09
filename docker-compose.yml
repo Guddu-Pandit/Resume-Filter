@@ -10,7 +10,7 @@ services:
   client:
     build: ./client
     ports:
-      - "80:80"
+      - "81:81"
     depends_on:
       - server
     restart: always
